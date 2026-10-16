@@ -1,7 +1,9 @@
-"""Controle do mpv (saída "Receiver"): fila, eventos e estado da reprodução."""
+"""mpv control (the "Receiver" output): queue, events, playback state, saved queue and play counting."""
 import itertools, json, os, socket, subprocess, tempfile, threading, time
 
+from . import db
 from .config import cfg
+from .history import min_listen, record_play
 from .state import albums, item, lock, state
 from .youtube import yt_direct
 
@@ -32,7 +34,7 @@ def mpv_start():
 
 
 def mpv_cmd(*cmds):
-    """Envia comandos ao mpv e devolve a lista de respostas (data ou None)."""
+    """Sends commands to mpv and returns the list of replies (data or None)."""
     try:
         c = socket.socket(socket.AF_UNIX)
         c.settimeout(2)
@@ -56,7 +58,7 @@ def mpv_cmd(*cmds):
                     msg = json.loads(line)
                 except ValueError:
                     continue
-                if msg.get("request_id") in ids:          # ignora eventos
+                if msg.get("request_id") in ids:          # skip events
                     out[msg["request_id"]] = msg.get("data")
     except OSError:
         pass
@@ -65,7 +67,7 @@ def mpv_cmd(*cmds):
 
 
 def mpv_events():
-    """Escuta eventos do mpv: quando a faixa termina, toca a próxima da fila."""
+    """Listens to mpv events: when a track ends, plays the next one in the queue."""
     while True:
         try:
             c = socket.socket(socket.AF_UNIX)
@@ -99,21 +101,29 @@ def mpv_events():
 
 def play_pos(pos, start=0):
     with lock:
+        state["restored"] = None
         if not 0 <= pos < len(state["queue"]):
             state["active"] = False
-            return
-        state["pos"] = pos
-        state["active"] = True
-        it = item(state["queue"][pos])
-        if it is None:
-            state["active"] = False
-            return
-        # vídeos do YouTube passam pelo próprio servidor (/api/stream), que renova o link quando expira
-        path = it.get("path") or f"http://{cfg.local_host}:{cfg.port}/api/stream/{it['id']}"
+            end = True
+        else:
+            end = False
+            state["pos"] = pos
+            state["active"] = True
+            state["gen"] += 1
+            it = item(state["queue"][pos])
+            if it is None:
+                state["active"] = False
+                return
+            # YouTube videos go through this server (/api/stream), which renews the link when it expires
+            path = it.get("path") or f"http://{cfg.local_host}:{cfg.port}/api/stream/{it['id']}"
+    if end:                                    # queue finished: nothing to resume after a restart
+        db.kv_delete("queue")
+        return
     state["error"] = ""
+    save_queue(start)
     if not it.get("path"):
         try:
-            yt_direct(it["id"])                    # já deixa o link pronto e mostra o erro, se houver
+            yt_direct(it["id"])                    # gets the link ready now and surfaces any error
         except Exception as e:
             state["error"], state["active"] = f"YouTube: {e}", False
             return
@@ -122,15 +132,124 @@ def play_pos(pos, start=0):
     mpv_cmd(["loadfile", path, "replace"], ["set_property", "pause", False])
 
 
+def stop():
+    with lock:
+        state["active"], state["restored"] = False, None
+    mpv_cmd(["stop"])
+    db.kv_delete("queue")
+
+
+def pause():
+    mpv_cmd(["set_property", "pause", True])
+    save_position()
+
+
+def resume():
+    with lock:
+        restored = None if state["active"] else state["restored"]
+        pos = state["pos"]
+    if restored is not None:                   # first "play" after a restart
+        play_pos(pos, restored)
+    else:
+        mpv_cmd(["set_property", "pause", False])
+
+
+def seek(t):
+    with lock:
+        restored = not state["active"] and state["restored"] is not None
+        if restored:
+            state["restored"] = t
+    if restored:
+        save_queue(t)
+    else:
+        mpv_cmd(["seek", t, "absolute"])
+
+
+# ---------------------------------------------------------------- saved queue (survives restarts)
+
+def save_queue(t=0):
+    with lock:
+        queue, pos = list(state["queue"]), state["pos"]
+    if queue and 0 <= pos < len(queue):
+        db.kv_set("queue", {"queue": queue, "pos": pos, "t": round(t or 0, 1), "saved": int(time.time())})
+
+
+def save_position():
+    with lock:
+        active = state["active"]
+    if active:
+        save_queue(mpv_cmd(["get_property", "time-pos"])[0] or 0)
+
+
+def restore_queue():
+    """Loads the queue saved before the last shutdown. It stays paused unless resume_on_start is set."""
+    saved = db.kv_get("queue")
+    if not saved:
+        return False
+    old, pos = saved.get("queue") or [], saved.get("pos", 0)
+    with lock:
+        queue = [t for t in old if item(t)]            # tracks may have been removed meanwhile
+    if not queue:
+        db.kv_delete("queue")
+        return False
+    cur = old[pos] if 0 <= pos < len(old) else None
+    if cur in queue:
+        pos, t = queue.index(cur), saved.get("t", 0)
+    else:                                              # current track is gone: continue with the next one
+        pos, t = min(len([x for x in old[:pos] if x in queue]), len(queue) - 1), 0
+    with lock:
+        state["queue"], state["pos"], state["active"], state["restored"] = queue, pos, False, t
+    if cfg.resume_on_start:
+        play_pos(pos, t)
+    return True
+
+
+# ---------------------------------------------------------------- play counting (remote output)
+
+def monitor():
+    """Counts plays on mpv (by time actually listened, so seeking doesn't count) and saves the position."""
+    key, listened, counted, last, last_save = None, 0.0, False, time.time(), 0.0
+    while True:
+        time.sleep(2)
+        try:
+            with lock:
+                active, gen = state["active"], state["gen"]
+                tid = state["queue"][state["pos"]] if active and 0 <= state["pos"] < len(state["queue"]) else None
+            now = time.time()
+            if tid is None:
+                key, last = None, now
+                continue
+            idle, paused, t, dur = mpv_cmd(["get_property", "idle-active"], ["get_property", "pause"],
+                                           ["get_property", "time-pos"], ["get_property", "duration"])
+            if (tid, gen) != key:
+                key, listened, counted = (tid, gen), 0.0, False
+            elif idle is False and paused is False:
+                listened += min(now - last, 5)        # cap: a stalled loop shouldn't count as listening
+            last = now
+            if not counted and listened >= min_listen(dur or (item(tid) or {}).get("dur", 0)):
+                record_play(tid, "remote")
+                counted = True
+            if idle is False and paused is False and now - last_save >= 10:
+                save_queue(t)
+                last_save = now
+        except Exception as e:
+            print("[player] monitor:", e, flush=True)
+
+
 def status():
     idle, paused, t, dur, vol = mpv_cmd(["get_property", "idle-active"], ["get_property", "pause"],
                                         ["get_property", "time-pos"], ["get_property", "duration"],
                                         ["get_property", "volume"])
     with lock:
-        cur = None
-        if state["active"] and 0 <= state["pos"] < len(state["queue"]):
-            cur = item(state["queue"][state["pos"]])
-        if cur is None or idle in (True, None):
+        cur, restored = None, False
+        if 0 <= state["pos"] < len(state["queue"]):
+            if state["active"]:
+                cur = item(state["queue"][state["pos"]])
+            elif state["restored"] is not None:            # saved queue, not started yet: show it as paused
+                cur, restored = item(state["queue"][state["pos"]]), True
+        if restored and cur:
+            st, t, dur = "paused", state["restored"], None
+        elif cur is None or idle in (True, None):
             st = "stopped"
         else:
             st = "paused" if paused else "playing"

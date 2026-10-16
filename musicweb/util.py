@@ -1,4 +1,4 @@
-"""Funções pequenas usadas em vários módulos."""
+"""Small helpers used by several modules."""
 import hashlib, json, os, re, urllib.request
 
 from .config import cfg
@@ -16,7 +16,7 @@ MIME = {".mp3": "audio/mpeg", ".flac": "audio/flac", ".m4a": "audio/mp4", ".aac"
         ".opus": "audio/ogg", ".wav": "audio/wav", ".wma": "audio/x-ms-wma"}
 
 
-# Sufixos como "(2003 Reissue)", "[Remastered]", " - Deluxe Edition"
+# Suffixes such as "(2003 Reissue)", "[Remastered]", " - Deluxe Edition"
 KW = (r"remaster|reissue|deluxe|edition|expanded|anniversary|bonus|version|mono|stereo|"
       r"special|collector|legacy|edição|remasterizad|disc|disk|cd\s*\d")
 SUFFIX_PAREN = re.compile(rf"\s*[(\[][^)\]]*(?:{KW})[^)\]]*[)\]]\s*$", re.I)

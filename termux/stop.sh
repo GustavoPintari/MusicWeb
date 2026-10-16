@@ -1,5 +1,5 @@
 #!/data/data/com.termux/files/usr/bin/sh
-# Para o musicweb iniciado por termux/start.sh (e libera o wake lock).
+# Stops musicweb started by termux/start.sh (and releases the wake lock).
 
 PIDFILE="$HOME/.cache/musicweb/server.pid"
 

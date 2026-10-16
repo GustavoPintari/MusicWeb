@@ -1,4 +1,4 @@
-"""Capas: da pasta do álbum, das tags ou da internet (iTunes / MusicBrainz / Deezer)."""
+"""Covers: from the album folder, the tags or online (iTunes / MusicBrainz / Deezer)."""
 import base64, json, os, re, threading, time
 import urllib.error, urllib.parse
 
@@ -8,13 +8,13 @@ from .util import IMG_EXTS, clean_album, http_get, inside_root, mutagen, safe_na
 from .youtube import yt_thumb
 
 
-mb_lock = threading.Lock()         # MusicBrainz: no máximo 1 requisição por segundo
+mb_lock = threading.Lock()         # MusicBrainz: at most 1 request per second
 mb_last = [0.0]
-it_lock = threading.Lock()         # iTunes: ~20 buscas por minuto
+it_lock = threading.Lock()         # iTunes: ~20 searches per minute
 it_bucket = {"tokens": 20.0, "t": time.time()}
 
 
-cover_ver = {}     # id do álbum -> versão da capa (muda quando a capa é trocada)
+cover_ver = {}     # album id -> cover version (changes when the cover is replaced)
 
 
 def versions_file():
@@ -48,11 +48,11 @@ def cover_score(fname, album, shared):
     n = os.path.splitext(fname)[0].lower()
     alb = album.lower()
     if n == "cover" and not shared or n == alb:
-        return 1000                # capa definida explicitamente (inclusive pela página)
+        return 1000                # cover set explicitly (including from the page)
     score = 0
     if alb and alb in n:
         score += 100
-    elif shared:                  # pasta com vários álbuns: só aceita imagem com o nome do álbum
+    elif shared:                  # folder with several albums: only accept images named after the album
         return None
     if n in ("cover", "folder", "front", "capa", "album", "albumart", "albumartlarge"):
         score += 60
@@ -66,7 +66,7 @@ def cover_score(fname, album, shared):
 
 
 def cover_from_folder(a):
-    """Procura imagem de capa na pasta do álbum (e em subpastas como Artwork/Scans)."""
+    """Looks for a cover image in the album folder (and subfolders such as Artwork/Scans)."""
     dirs = {a["dir"]} | {os.path.dirname(tracks[t]["path"]) for t in a["tracks"] if t in tracks}
     cands = []
     for d in dirs:
@@ -92,7 +92,7 @@ def cover_from_folder(a):
                     cands.append((sc, os.path.getsize(p), p))
     if not cands:
         return None
-    cands.sort(reverse=True)               # maior pontuação, depois maior arquivo
+    cands.sort(reverse=True)               # highest score, then largest file
     with open(cands[0][2], "rb") as fh:
         return fh.read()
 
@@ -139,11 +139,11 @@ def itunes_wait():
 
 
 def cover_online(a):
-    """Devolve (imagem, certeza_de_que_não_existe)."""
+    """Returns (image, sure_it_does_not_exist)."""
     name = clean_album(a["full"])
     artist = "" if a["artist"] in ("Vários artistas", "Desconhecido") else a["artist"]
     net_ok = True
-    # 1) iTunes: rápido, boa cobertura
+    # 1) iTunes: fast, good coverage
     try:
         itunes_wait()
         term = urllib.parse.quote(f"{artist} {name}".strip())
@@ -156,7 +156,7 @@ def cover_online(a):
     except Exception as e:
         net_ok = False
         print("[capa] itunes:", e, flush=True)
-    # 2) MusicBrainz + Cover Art Archive (mais lento)
+    # 2) MusicBrainz + Cover Art Archive (slower)
     try:
         with mb_lock:
             wait = 1.1 - (time.time() - mb_last[0])
@@ -206,15 +206,15 @@ def get_cover(aid):
     if data:
         with open(img, "wb") as fh:
             fh.write(data)
-    elif sure:                     # só lembra "sem capa" se a busca não falhou por rede
+    elif sure:                     # only remember "no cover" if the lookup did not fail because of the network
         open(miss, "w").close()
     return data
 
 
-# ---------------------------------------------------------------- trocar capa
+# ---------------------------------------------------------------- change cover
 
 
-COVER_HOSTS = ("mzstatic.com", "dzcdn.net")       # de onde a página pode mandar baixar capas
+COVER_HOSTS = ("mzstatic.com", "dzcdn.net")       # hosts the page may ask us to download covers from
 
 
 def set_cover(aid, data):
@@ -230,7 +230,7 @@ def set_cover(aid, data):
     ext = {"image/png": ".png", "image/webp": ".webp", "image/gif": ".gif", "image/bmp": ".bmp"}.get(kind, ".jpg")
     stem = safe_name(a["full"]) if a["shared"] else "cover"
     ts = time.strftime("%Y%m%d-%H%M%S")
-    for f in os.listdir(a["dir"]):                       # guarda a capa anterior como .bak
+    for f in os.listdir(a["dir"]):                       # keep the previous cover as .bak
         base, e = os.path.splitext(f)
         if base.lower() == stem.lower() and e.lower() in IMG_EXTS:
             os.rename(os.path.join(a["dir"], f), os.path.join(a["dir"], f"{f}.{ts}.bak"))
