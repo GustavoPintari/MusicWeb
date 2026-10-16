@@ -20,8 +20,12 @@ It only needs the Python standard library. `mutagen` and `yt-dlp` are optional a
 - **Edit tags** (album, artist, year, tracks) and **remove albums** (they go to a trash folder).
 - **Download** a whole album as a `.zip`.
 - 🎤 **Lyrics**: from a `.lrc`/`.txt` file, the tags or [LRCLIB](https://lrclib.net). Synced lyrics highlight the current line and let you jump to it.
-- ▶ **YouTube**: paste a link and play only the audio, on either output.
+- ▶ **YouTube**: paste a video or **playlist** link and play only the audio, on either output.
+- 📻 **Internet radio**: thousands of stations from [Radio Browser](https://www.radio-browser.info), searchable by name, country and genre, with favorites; shows the song on air when the station sends it.
 - 📊 **Tocadas** (played) tab: most played tracks and artists (last 7 days, 30 days or all time) and the play history.
+- ✨ **Retrospectiva** (recap): a month or a year of listening — hours, top tracks, artists and albums, busiest hour and day, comparison with the previous period.
+- 🎨 **Album colors**: opening an album paints the background with a gradient from its cover's dominant color.
+- **Gapless playback and ReplayGain** on the Receiver (mpv).
 - **Queue survives restarts**: after a reboot or crash, the queue comes back paused where it stopped — press play to continue.
 - **Interface in Portuguese (BR) or English** (`[interface] language`).
 - **Fast startup** on large libraries: tags are read once and cached in SQLite; later scans only read new or changed files.
@@ -98,11 +102,14 @@ The file is looked up in this order: `--config`, the `MUSICWEB_CONFIG` variable,
 | `[library] rescan_every` | `60` | seconds between checks for new music (0 disables) |
 | `[library] trash_dir` | *(next to the library)* | where removed albums go |
 | `[mpv] audio_output` | `opensles` | mpv audio output (`--ao`) |
+| `[mpv] gapless` | `true` | no pause between tracks (the next one is preloaded) |
+| `[mpv] replaygain` | `album` | volume leveling from ReplayGain tags: `album`, `track` or `no` |
 | `[covers] online` | `true` | look up covers online |
 | `[lyrics] online` | `true` | look up lyrics on LRCLIB |
 | `[youtube] cookies` | *(empty)* | `cookies.txt` in case YouTube asks you to sign in |
 | `[youtube] max_history` | `50` | videos kept in "Tocados recentemente" (recently played) |
 | `[youtube] format` | m4a / best audio | format requested from yt-dlp |
+| `[youtube] playlist_max` | `200` | videos read from a playlist link |
 | `[player] resume_on_start` | `false` | after a restart, play the saved queue right away |
 | `[history] enabled` | `true` | record plays (history and most played) |
 | `[history] min_seconds` | `30` | listening time before a track counts as played (half the track if shorter) |
@@ -140,10 +147,18 @@ If the lyrics are wrong (or missing), use **"Buscar outra"** (search again) to f
 
 Requires `yt-dlp`. The audio goes through the server itself (`/api/stream/yt_<id>`), which renews the YouTube link when it expires — so it works both in mpv and in the browser.
 
+**Playlists**: a link with `list=` (a playlist, an album on YouTube Music or a mix) is read in one go with `yt-dlp --flat-playlist`, without downloading anything; each video is only resolved when its turn comes. Private or deleted videos are skipped. The playlist shows up as a single entry in "recently played".
+
 If you see *"o YouTube pediu login para confirmar que não é um robô"* (YouTube asked to sign in to confirm you're not a bot):
 
 1. update yt-dlp: `pip install -U yt-dlp`;
 2. if it keeps happening, export your YouTube cookies ([how to](https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp)) and set `[youtube] cookies = "~/cookies.txt"`.
+
+### Internet radio
+
+The 📻 button opens the station list, from [Radio Browser](https://www.radio-browser.info) — a free, community-run directory (no account or API key). Search by name, pick a country (all countries the first time; the last choice is remembered) and a genre, and star your favorites. The server picks a Radio Browser mirror, sends a descriptive User-Agent and reports a "click" when a station is played, as the project asks.
+
+On the Receiver, mpv plays the stream and shows the song on air (ICY metadata), which is also used to look up the lyrics. In the browser, most MP3/AAC streams play directly; HLS (`.m3u8`) streams may not play on desktop browsers. Radio is not counted in the history or the recap.
 
 ### Database
 
@@ -151,7 +166,8 @@ If you see *"o YouTube pediu login para confirmar que não é um robô"* (YouTub
 
 - **scan cache** — the tags of each file, with its modification time and size; only new or changed files are read again;
 - **play history** — one row per play; a track counts after `min_seconds` of actual listening (seeking doesn't count), on mpv and in the browser;
-- **saved queue** — the queue, the current track and position (saved every ~10 s while playing and on pause).
+- **saved queue** — the queue, the current track and position (saved every ~10 s while playing and on pause);
+- **radio** — favorite and recent stations and the last search filters.
 
 SQLite comes with Python, so there is nothing extra to install. To back up your history, copy `musicweb.db`; deleting it only resets the history and the queue (the scan cache is rebuilt on the next start).
 
@@ -173,7 +189,9 @@ musicweb/
 ├── covers.py           local, embedded and online covers; cover changes
 ├── player.py           mpv control (queue, events, status, saved queue, play counting)
 ├── editor.py           tag editing and album removal
-├── youtube.py          yt-dlp, direct links and history
+├── youtube.py          yt-dlp, direct links, playlists and history
+├── radio.py            internet radio (Radio Browser): search, favorites, recent
+├── retro.py            retrospective (recap) of a month or a year
 ├── lyrics.py           lyrics (.lrc, tags, LRCLIB)
 ├── web.py              HTTP server: API routes, streaming and downloads
 ├── i18n.py             interface language for server messages (the page has its own dictionary)
@@ -181,7 +199,7 @@ musicweb/
 └── static/index.html   the page (HTML, CSS and JS in one file)
 ```
 
-Module dependencies (no cycles): `config` → `state`/`util`/`db` → `youtube`/`history` → `covers` → `library` / `player` / `lyrics` → `editor` → `web` → `app`.
+Module dependencies (no cycles): `config` → `state`/`util`/`db` → `youtube`/`history`/`radio` → `covers` → `library` / `player` / `lyrics` / `retro` → `editor` → `web` → `app`.
 
 ### API
 
@@ -195,7 +213,10 @@ Module dependencies (no cycles): `config` → `state`/`util`/`db` → `youtube`/
 | GET | `/api/cover_search?q=` | cover suggestions |
 | GET | `/api/lyrics?id=[&artist=&title=]` | lyrics |
 | GET | `/api/stats?days=` | most played tracks/artists and history (`days=0`: all time) |
-| POST | `/api/play` `{album}` or `{id, t}` | play on mpv |
+| GET | `/api/retro` · `/api/retro?period=2026-10` | periods with plays · recap of a month (`YYYY-MM`) or year (`YYYY`) |
+| GET | `/api/yt_playlist?id=` | videos of a YouTube playlist |
+| GET | `/api/radio` · `/api/radio/countries` · `/api/radio/tags` · `/api/radio/search?q=&country=&tag=` | radio: favorites/recent/filters, countries, genres, search |
+| POST | `/api/play` `{album}`, `{id, t}`, `{playlist, pos}` or `{queue: [ids], pos}` | play on mpv |
 | POST | `/api/pause`, `/resume`, `/stop`, `/next`, `/prev` | controls |
 | POST | `/api/seek` `{t}` · `/api/volume` `{v}` or `{delta}` | position and volume |
 | POST | `/api/rescan` | re-reads the library |
@@ -203,6 +224,7 @@ Module dependencies (no cycles): `config` → `state`/`util`/`db` → `youtube`/
 | POST | `/api/cover_set` `{album, url}` · `/api/cover_upload?album=` | change cover |
 | POST | `/api/yt` `{url}` · `/api/yt_remove` `{id}` | YouTube |
 | POST | `/api/played` `{id}` | the browser reports a play ("this device" output) |
+| POST | `/api/radio/select` `{uuid}` · `/api/radio/favorite` `{uuid, on}` | prepare a station to play · (un)favorite it |
 
 ### License
 
@@ -224,8 +246,12 @@ Só usa a biblioteca padrão do Python. `mutagen` e `yt-dlp` são opcionais e li
 - **Editar tags** (álbum, artista, ano, faixas) e **remover álbuns** (vão para uma lixeira).
 - **Baixar** o álbum inteiro em `.zip`.
 - 🎤 **Letras**: de arquivo `.lrc`/`.txt`, das tags ou do [LRCLIB](https://lrclib.net). Letras sincronizadas destacam a linha atual e permitem pular para ela.
-- ▶ **YouTube**: cole um link e toque só o áudio, em qualquer uma das saídas.
+- ▶ **YouTube**: cole o link de um vídeo ou de uma **playlist** e toque só o áudio, em qualquer uma das saídas.
+- 📻 **Rádios online**: milhares de rádios do [Radio Browser](https://www.radio-browser.info), com busca por nome, país e gênero e favoritas; mostra a música no ar quando a rádio informa.
 - 📊 Aba **Tocadas**: músicas e artistas mais ouvidos (últimos 7 dias, 30 dias ou sempre) e o histórico de reprodução.
+- ✨ **Retrospectiva**: um mês ou um ano de música — horas, músicas, artistas e álbuns mais ouvidos, horário e dia preferidos, comparação com o período anterior.
+- 🎨 **Cores do disco**: ao abrir um álbum, o fundo ganha um degradê com a cor dominante da capa.
+- **Reprodução sem pausa entre faixas (gapless) e ReplayGain** no Receiver (mpv).
 - **Fila que sobrevive a reinício**: depois de religar o celular ou de uma queda, a fila volta pausada onde parou — é só apertar play.
 - **Interface em português (BR) ou inglês** (`[interface] language`).
 - **Inicialização rápida** em bibliotecas grandes: as tags são lidas uma vez e guardadas no SQLite; as varreduras seguintes só leem arquivos novos ou alterados.
@@ -302,11 +328,14 @@ O arquivo é procurado nesta ordem: `--config`, variável `MUSICWEB_CONFIG`, `./
 | `[library] rescan_every` | `60` | segundos entre buscas por músicas novas (0 desliga) |
 | `[library] trash_dir` | *(ao lado da biblioteca)* | para onde vão os álbuns removidos |
 | `[mpv] audio_output` | `opensles` | saída de áudio do mpv (`--ao`) |
+| `[mpv] gapless` | `true` | sem pausa entre as faixas (a próxima é pré-carregada) |
+| `[mpv] replaygain` | `album` | equaliza o volume pelas tags ReplayGain: `album`, `track` ou `no` |
 | `[covers] online` | `true` | busca capas na internet |
 | `[lyrics] online` | `true` | busca letras no LRCLIB |
 | `[youtube] cookies` | *(vazio)* | `cookies.txt` caso o YouTube peça login |
 | `[youtube] max_history` | `50` | vídeos guardados em "Tocados recentemente" |
 | `[youtube] format` | m4a / melhor áudio | formato pedido ao yt-dlp |
+| `[youtube] playlist_max` | `200` | vídeos lidos de um link de playlist |
 | `[player] resume_on_start` | `false` | depois de reiniciar, já toca a fila salva |
 | `[history] enabled` | `true` | registra as reproduções (histórico e mais tocadas) |
 | `[history] min_seconds` | `30` | tempo ouvindo até a música contar como tocada (metade da faixa, se for mais curta) |
@@ -344,10 +373,18 @@ Se vier a letra errada (ou nenhuma), use **"Buscar outra"** para corrigir artist
 
 Precisa do `yt-dlp`. O áudio passa pelo próprio servidor (`/api/stream/yt_<id>`), que renova o link do YouTube quando ele expira — assim funciona tanto no mpv quanto no navegador.
 
+**Playlists**: um link com `list=` (playlist, álbum do YouTube Music ou mix) é lido de uma vez com `yt-dlp --flat-playlist`, sem baixar nada; cada vídeo só é resolvido quando chega a vez dele. Vídeos privados ou apagados são pulados. A playlist aparece como um item só em "Tocados recentemente".
+
 Se aparecer *"o YouTube pediu login para confirmar que não é um robô"*:
 
 1. atualize o yt-dlp: `pip install -U yt-dlp`;
 2. se continuar, exporte os cookies do YouTube ([como fazer](https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp)) e configure `[youtube] cookies = "~/cookies.txt"`.
+
+### Rádios online
+
+O botão 📻 abre a lista de rádios, vinda do [Radio Browser](https://www.radio-browser.info) — um catálogo gratuito e comunitário (sem conta nem chave de API). Busque pelo nome, escolha o país (na primeira vez, todos os países; depois vale a última escolha) e o gênero, e marque as favoritas com ★. O servidor escolhe um espelho do Radio Browser, se identifica com um User-Agent e registra o "clique" ao tocar uma rádio, como o projeto pede.
+
+No Receiver, o mpv toca o stream e mostra a música no ar (metadados ICY), que também é usada para buscar a letra. No navegador, a maioria dos streams MP3/AAC toca direto; streams HLS (`.m3u8`) podem não tocar em navegadores de computador. Rádio não entra no histórico nem na retrospectiva.
 
 ### Banco de dados
 
@@ -355,7 +392,8 @@ O `musicweb.db` (SQLite, em `[data] dir`) guarda:
 
 - **cache da varredura** — as tags de cada arquivo, com data de modificação e tamanho; só arquivos novos ou alterados são lidos de novo;
 - **histórico** — uma linha por reprodução; a música conta depois de `min_seconds` ouvindo de verdade (pular trechos não conta), tanto no mpv quanto no navegador;
-- **fila salva** — a fila, a faixa atual e a posição (salva a cada ~10 s tocando e ao pausar).
+- **fila salva** — a fila, a faixa atual e a posição (salva a cada ~10 s tocando e ao pausar);
+- **rádios** — favoritas, recentes e os últimos filtros de busca.
 
 O SQLite já vem com o Python, então não há nada extra para instalar. Para fazer backup do histórico, copie o `musicweb.db`; apagá-lo só zera o histórico e a fila (o cache da varredura é refeito na próxima inicialização).
 
@@ -377,7 +415,9 @@ musicweb/
 ├── covers.py           capas locais, embutidas e online; troca de capa
 ├── player.py           controle do mpv (fila, eventos, status, fila salva, contagem de reproduções)
 ├── editor.py           edição de tags e remoção de álbuns
-├── youtube.py          yt-dlp, links diretos e histórico
+├── youtube.py          yt-dlp, links diretos, playlists e histórico
+├── radio.py            rádios online (Radio Browser): busca, favoritas, recentes
+├── retro.py            retrospectiva de um mês ou de um ano
 ├── lyrics.py           letras (.lrc, tags, LRCLIB)
 ├── web.py              servidor HTTP: rotas da API, streaming e downloads
 ├── i18n.py             idioma da interface nas mensagens do servidor (a página tem o próprio dicionário)
@@ -385,7 +425,7 @@ musicweb/
 └── static/index.html   a página (HTML, CSS e JS num arquivo só)
 ```
 
-Dependências entre módulos (sem ciclos): `config` → `state`/`util`/`db` → `youtube`/`history` → `covers` → `library` / `player` / `lyrics` → `editor` → `web` → `app`.
+Dependências entre módulos (sem ciclos): `config` → `state`/`util`/`db` → `youtube`/`history`/`radio` → `covers` → `library` / `player` / `lyrics` / `retro` → `editor` → `web` → `app`.
 
 ### API
 
@@ -399,7 +439,10 @@ Dependências entre módulos (sem ciclos): `config` → `state`/`util`/`db` → 
 | GET | `/api/cover_search?q=` | sugestões de capa |
 | GET | `/api/lyrics?id=[&artist=&title=]` | letra |
 | GET | `/api/stats?days=` | mais tocadas, artistas e histórico (`days=0`: sempre) |
-| POST | `/api/play` `{album}` ou `{id, t}` | toca no mpv |
+| GET | `/api/retro` · `/api/retro?period=2026-10` | períodos com músicas · retrospectiva de um mês (`AAAA-MM`) ou ano (`AAAA`) |
+| GET | `/api/yt_playlist?id=` | vídeos de uma playlist do YouTube |
+| GET | `/api/radio` · `/api/radio/countries` · `/api/radio/tags` · `/api/radio/search?q=&country=&tag=` | rádios: favoritas/recentes/filtros, países, gêneros, busca |
+| POST | `/api/play` `{album}`, `{id, t}`, `{playlist, pos}` ou `{queue: [ids], pos}` | toca no mpv |
 | POST | `/api/pause`, `/resume`, `/stop`, `/next`, `/prev` | controles |
 | POST | `/api/seek` `{t}` · `/api/volume` `{v}` ou `{delta}` | posição e volume |
 | POST | `/api/rescan` | relê a biblioteca |
@@ -407,6 +450,7 @@ Dependências entre módulos (sem ciclos): `config` → `state`/`util`/`db` → 
 | POST | `/api/cover_set` `{album, url}` · `/api/cover_upload?album=` | trocar capa |
 | POST | `/api/yt` `{url}` · `/api/yt_remove` `{id}` | YouTube |
 | POST | `/api/played` `{id}` | o navegador avisa uma reprodução (saída "Este dispositivo") |
+| POST | `/api/radio/select` `{uuid}` · `/api/radio/favorite` `{uuid, on}` | prepara uma rádio para tocar · favorita/desfavorita |
 
 ### Licença
 

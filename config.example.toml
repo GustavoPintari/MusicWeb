@@ -18,6 +18,8 @@ trash_dir = ""                # empty = .musicweb-lixeira folder next to the lib
 
 [mpv]
 audio_output = "opensles"     # mpv audio output (--ao)
+gapless = true                # no pause between tracks (the next one is preloaded)
+replaygain = "album"          # volume leveling from ReplayGain tags: "album", "track" or "no"
 
 [player]
 resume_on_start = false       # after a restart, play the saved queue right away (false = wait for "play")
@@ -36,6 +38,7 @@ online = true                 # look up lyrics on LRCLIB when there is no .lrc f
 cookies = ""                  # path to a cookies.txt, in case YouTube asks to sign in ("not a bot")
 max_history = 50              # videos kept in "Tocados recentemente"
 format = "bestaudio[ext=m4a]/bestaudio[acodec^=mp4a]/bestaudio/best"
+playlist_max = 200            # videos read from a playlist link
 
 [cache]
 dir = "~/.cache/musicweb"     # disposable: covers, lyrics and YouTube history

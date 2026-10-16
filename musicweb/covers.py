@@ -4,7 +4,8 @@ import urllib.error, urllib.parse
 
 from .config import cfg
 from .i18n import _
-from .state import albums, lock, tracks, yt_items
+from .radio import icon as radio_icon
+from .state import albums, lock, tracks, yt_items, yt_playlists
 from .util import IMG_EXTS, clean_album, http_get, inside_root, mutagen, safe_name, sniff
 from .youtube import yt_thumb
 
@@ -186,8 +187,10 @@ def cover_online(a):
 
 
 def get_cover(aid):
-    if aid in yt_items:
+    if aid in yt_items or aid in yt_playlists:
         return yt_thumb(aid)
+    if aid.startswith("radio_"):
+        return radio_icon(aid)
     a = albums.get(aid)
     if not a:
         return None

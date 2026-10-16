@@ -19,13 +19,13 @@ def record_play(tid, output="remote"):
         return False
     with lock:
         it = item(tid)
-        if it is None:
+        if it is None or it.get("radio"):          # radio is not part of the history / retrospective
             return False
         alb = albums.get(it["album"])
         title, artist = it["title"], it["artist"] or (alb["artist"] if alb else "")
         album = alb["name"] if alb else "YouTube"
-    db.execute("INSERT INTO plays(track_id, played_at, title, artist, album, output) VALUES(?, ?, ?, ?, ?, ?)",
-               (tid, int(time.time()), title, artist, album, output))
+    db.execute("INSERT INTO plays(track_id, played_at, title, artist, album, output, dur) VALUES(?, ?, ?, ?, ?, ?, ?)",
+               (tid, int(time.time()), title, artist, album, output, it["dur"] or 0))
     return True
 
 

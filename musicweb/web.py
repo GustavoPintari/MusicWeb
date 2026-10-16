@@ -2,6 +2,7 @@
 import json, os, re, urllib.error, urllib.parse, urllib.request, zipfile
 from http.server import BaseHTTPRequestHandler
 
+from . import radio
 from .config import cfg
 from .covers import cover_candidates, cover_from_url, get_cover, set_cover
 from .editor import edit_album, remove_album
@@ -10,9 +11,10 @@ from .i18n import _
 from .library import library_json, scan
 from .lyrics import get_lyrics
 from .player import mpv_cmd, pause, play_pos, resume, seek, status, stop
-from .state import albums, lock, state, tracks, yt_items
+from .retro import periods as retro_periods, retro
+from .state import albums, item, lock, state, tracks, yt_items, yt_playlists
 from .util import MIME, safe_name, sniff, zip_name
-from .youtube import yt_add, yt_direct, yt_remove
+from .youtube import pl_public, yt_add, yt_direct, yt_remove
 
 STATIC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
 
@@ -66,6 +68,14 @@ class H(BaseHTTPRequestHandler):
             self.send(json.dumps(cover_candidates(q.get("q", [""])[0])))
         elif p == "/api/lyrics":
             self.send(json.dumps(get_lyrics(q.get("id", [""])[0], q.get("artist", [""])[0], q.get("title", [""])[0])))
+        elif p == "/api/yt_playlist":
+            pl = yt_playlists.get(q.get("id", [""])[0])
+            self.send(json.dumps(pl_public(pl, entries=True) if pl else {"error": _("não encontrado")}), code=200 if pl else 404)
+        elif p == "/api/retro":
+            period = q.get("period", [""])[0]
+            self.send(json.dumps(retro(period) if period else retro_periods()))
+        elif p.startswith("/api/radio"):
+            self.radio_get(p, q)
         elif p == "/api/stats":
             try:
                 days = int(q.get("days", ["0"])[0])
@@ -129,6 +139,24 @@ class H(BaseHTTPRequestHandler):
                     left -= len(chunk)
         except (BrokenPipeError, ConnectionResetError):
             pass                                    # the browser cancelled (normal when seeking)
+
+    def radio_get(self, p, q):
+        arg = lambda k: q.get(k, [""])[0]
+        try:
+            if p == "/api/radio":
+                data = radio.overview()
+            elif p == "/api/radio/countries":
+                data = radio.countries()
+            elif p == "/api/radio/tags":
+                data = radio.tags()
+            elif p == "/api/radio/search":
+                data = radio.search(arg("q").strip(), arg("country"), arg("tag"))
+            else:
+                return self.send("{}", code=404)
+        except Exception as e:
+            print("[rádio]", e, flush=True)
+            return self.send(json.dumps({"error": _("Não consegui falar com o Radio Browser")}), code=502)
+        self.send(json.dumps(data))
 
     def yt_stream(self, tid, attachment=False):
         """Relays the YouTube audio (with Range, so seeking works)."""
@@ -229,7 +257,15 @@ class H(BaseHTTPRequestHandler):
                 elif body.get("id") in tracks:
                     queue = albums[tracks[body["id"]]["album"]]["tracks"]
                     pos = queue.index(body["id"])
-                elif body.get("id") in yt_items:
+                elif body.get("playlist") in yt_playlists:      # YouTube playlist, optionally from a given video
+                    queue = yt_playlists[body["playlist"]]["entries"]
+                    pos = min(max(int(body.get("pos") or 0), 0), len(queue) - 1)
+                elif isinstance(body.get("queue"), list) and body["queue"]:   # any list of known ids
+                    queue = [i for i in body["queue"] if item(i)]
+                    pos = min(max(int(body.get("pos") or 0), 0), max(len(queue) - 1, 0))
+                    if not queue:
+                        return self.send(json.dumps({"error": _("não encontrado")}), code=404)
+                elif item(body.get("id")):                       # YouTube video or radio station
                     queue, pos = [body["id"]], 0
                 else:
                     return self.send(json.dumps({"error": _("não encontrado")}), code=404)
@@ -253,6 +289,18 @@ class H(BaseHTTPRequestHandler):
                 play_pos(max(0, state["pos"] - 1))
         elif p == "/api/seek":
             seek(float(body.get("t", 0)))
+        elif p == "/api/radio/select":                   # before playing a station (either output)
+            try:
+                st = radio.select(str(body.get("uuid", "")))
+            except Exception:
+                st = None
+            return self.send(json.dumps({"ok": bool(st), "station": st} if st else
+                                        {"ok": False, "error": _("Rádio não encontrada")}))
+        elif p == "/api/radio/favorite":
+            try:
+                return self.send(json.dumps({"ok": True, "favorites": radio.favorite(str(body.get("uuid", "")), bool(body.get("on")))}))
+            except Exception:
+                return self.send(json.dumps({"ok": False, "error": _("Não consegui falar com o Radio Browser")}))
         elif p == "/api/played":                         # the browser ("this device") listened to a track
             return self.send(json.dumps({"ok": record_play(str(body.get("id", "")), "local")}))
         elif p == "/api/volume":

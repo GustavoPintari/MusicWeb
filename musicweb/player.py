@@ -26,7 +26,10 @@ def mpv_start():
         pass
     mpv["proc"] = subprocess.Popen(
         ["mpv", "--idle=yes", "--no-video", "--no-terminal", f"--ao={cfg.mpv_ao}",
-         f"--input-ipc-server={MPV_SOCK}"],
+         f"--input-ipc-server={MPV_SOCK}",
+         # gapless: the next track is appended to mpv's playlist ahead of time (see queue_next)
+         f"--gapless-audio={'yes' if cfg.mpv_gapless else 'no'}", f"--prefetch-playlist={'yes' if cfg.mpv_gapless else 'no'}",
+         f"--replaygain={cfg.mpv_replaygain}"],
         stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     for _try in range(50):
         if os.path.exists(MPV_SOCK):
@@ -94,15 +97,20 @@ def mpv_events():
                     if ev.get("reason") == "error":
                         state["error"] = _("mpv não conseguiu tocar: {err}", err=ev.get("file_error", _("erro")))
                     if ev.get("reason") in ("eof", "error") and state["active"]:
-                        threading.Thread(target=play_pos, args=(state["pos"] + 1,), daemon=True).start()
+                        threading.Thread(target=track_ended, daemon=True).start()
         except OSError:
             pass
         time.sleep(1)
 
 
+def media_path(it):
+    """What mpv opens: the file, the radio stream, or (YouTube) this server's /api/stream, which renews expired links."""
+    return it.get("path") or f"http://{cfg.local_host}:{cfg.port}/api/stream/{it['id']}"
+
+
 def play_pos(pos, start=0):
     with lock:
-        state["restored"] = None
+        state["restored"], state["appended"] = None, None
         if not 0 <= pos < len(state["queue"]):
             state["active"] = False
             end = True
@@ -115,27 +123,65 @@ def play_pos(pos, start=0):
             if it is None:
                 state["active"] = False
                 return
-            # YouTube videos go through this server (/api/stream), which renews the link when it expires
-            path = it.get("path") or f"http://{cfg.local_host}:{cfg.port}/api/stream/{it['id']}"
+            path = media_path(it)
+            more = pos + 1 < len(state["queue"])
     if end:                                    # queue finished: nothing to resume after a restart
         db.kv_delete("queue")
         return
+    if it.get("radio"):
+        start = 0                              # live stream: nothing to seek to
     state["error"] = ""
     save_queue(start)
     if not it.get("path"):
         try:
             yt_direct(it["id"])                    # gets the link ready now and surfaces any error
         except Exception as e:
-            state["error"], state["active"] = f"YouTube: {e}", False
+            state["error"] = f"YouTube: {e}"
+            if more:                               # e.g. a private video in a playlist: skip it
+                return play_pos(pos + 1)
+            state["active"] = False
             return
     mpv_start()
     state["seek"] = start if start and start > 1 else None
-    mpv_cmd(["loadfile", path, "replace"], ["set_property", "pause", False])
+    mpv_cmd(["playlist-clear"], ["loadfile", path, "replace"], ["set_property", "pause", False])
+    queue_next()
+
+
+def queue_next():
+    """Gapless: appends the next queue item to mpv's playlist, so mpv preloads it and goes on without a pause."""
+    if not cfg.mpv_gapless:
+        return
+    with lock:
+        nxt = state["pos"] + 1
+        if not state["active"] or nxt >= len(state["queue"]) or state["appended"] == nxt:
+            return
+        it = item(state["queue"][nxt])
+        if it is None or it.get("radio"):
+            return
+        state["appended"] = nxt
+        path = media_path(it)
+    mpv_cmd(["loadfile", path, "append"])
+
+
+def track_ended():
+    """mpv finished the current track: follow mpv onto the appended one, or load the next one ourselves."""
+    with lock:
+        followed = state["active"] and state["appended"] == state["pos"] + 1
+        if followed:
+            state["pos"] += 1
+            state["gen"] += 1
+            state["appended"] = None
+        nxt = state["pos"] + 1
+    if followed:
+        save_queue(0)
+        queue_next()
+    else:
+        play_pos(nxt)
 
 
 def stop():
     with lock:
-        state["active"], state["restored"] = False, None
+        state["active"], state["restored"], state["appended"] = False, None, None
     mpv_cmd(["stop"])
     db.kv_delete("queue")
 
@@ -238,9 +284,10 @@ def monitor():
 
 
 def status():
-    idle, paused, t, dur, vol = mpv_cmd(["get_property", "idle-active"], ["get_property", "pause"],
-                                        ["get_property", "time-pos"], ["get_property", "duration"],
-                                        ["get_property", "volume"])
+    idle, paused, t, dur, vol, live = mpv_cmd(["get_property", "idle-active"], ["get_property", "pause"],
+                                              ["get_property", "time-pos"], ["get_property", "duration"],
+                                              ["get_property", "volume"],
+                                              ["get_property", "metadata/by-key/icy-title"])   # radio: song on air
     with lock:
         cur, restored = None, False
         if 0 <= state["pos"] < len(state["queue"]):
@@ -255,9 +302,11 @@ def status():
         else:
             st = "paused" if paused else "playing"
         alb = cur and albums.get(cur["album"])
+        radio = bool(cur and cur.get("radio"))
         return {"state": st, "pos": state["pos"], "total": len(state["queue"]),
                 "time": t or 0, "dur": dur or (cur["dur"] if cur else 0), "error": state["error"],
                 "volume": round(vol) if vol is not None else None, "lib": state["lib"],
                 "track": cur and {**{k: cur[k] for k in ("id", "title", "artist", "album", "fmt", "q")},
-                                  "album_name": name(alb["name"]) if alb else "YouTube",
-                                  "album_artist": name(alb["artist"]) if alb else cur["artist"]}}
+                                  "album_name": name(alb["name"]) if alb else (cur["country"] if radio else "YouTube"),
+                                  "album_artist": name(alb["artist"]) if alb else cur["artist"],
+                                  "radio": radio, "live": (live or "") if radio and st != "stopped" else ""}}

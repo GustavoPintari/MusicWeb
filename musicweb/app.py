@@ -2,7 +2,7 @@
 import argparse, threading, time
 from http.server import ThreadingHTTPServer
 
-from . import covers, db, youtube
+from . import covers, db, radio, youtube
 from .config import cfg
 from .library import scan, watch_library
 from .player import monitor, mpv_events, mpv_start, restore_queue
@@ -30,6 +30,7 @@ def main(argv=None):
     db.open_db(cfg.db_file)
     covers.load_versions()
     youtube.load_history()
+    radio.load()
     t0 = time.time()
     _, read = scan(cfg.root)
     print(f"{len(tracks)} faixas em {len(albums)} álbuns ({cfg.root}) em {time.time() - t0:.1f}s, "
