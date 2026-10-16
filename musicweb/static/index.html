@@ -6,6 +6,8 @@
 <style>
 :root{--bg:#121212;--card:#1c1c1c;--card2:#262626;--fg:#f2f2f2;--mut:#9a9a9a;--ac:#5aa9e6;--err:#ff6b6b}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+/* scrolling works as usual (wheel, touch, keyboard); only the scrollbars are hidden */
+*{scrollbar-width:none}*::-webkit-scrollbar{display:none}
 body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.35 system-ui,-apple-system,sans-serif;padding:0 16px calc(var(--barh,150px) + 24px)}
 button{font:inherit;color:inherit;background:var(--card2);border:0;border-radius:10px;padding:9px 12px;cursor:pointer;
   transition:transform .08s ease,background .15s ease,filter .15s ease;user-select:none}
