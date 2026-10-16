@@ -108,7 +108,7 @@ def media_path(it):
     return it.get("path") or f"http://{cfg.local_host}:{cfg.port}/api/stream/{it['id']}"
 
 
-def play_pos(pos, start=0):
+def play_pos(pos, start=0, fails=0):
     with lock:
         state["restored"], state["appended"] = None, None
         if not 0 <= pos < len(state["queue"]):
@@ -137,8 +137,8 @@ def play_pos(pos, start=0):
             yt_direct(it["id"])                    # gets the link ready now and surfaces any error
         except Exception as e:
             state["error"] = f"YouTube: {e}"
-            if more:                               # e.g. a private video in a playlist: skip it
-                return play_pos(pos + 1)
+            if more and fails < 2:                 # e.g. a private video in a playlist: skip it
+                return play_pos(pos + 1, fails=fails + 1)   # but not a whole playlist when YouTube refuses all
             state["active"] = False
             return
     mpv_start()

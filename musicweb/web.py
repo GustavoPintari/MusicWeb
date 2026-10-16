@@ -14,7 +14,7 @@ from .player import mpv_cmd, pause, play_pos, resume, seek, status, stop
 from .retro import periods as retro_periods, retro
 from .state import albums, item, lock, state, tracks, yt_items, yt_playlists
 from .util import MIME, safe_name, sniff, zip_name
-from .youtube import pl_public, yt_add, yt_direct, yt_remove
+from .youtube import pl_public, yt_add, yt_check, yt_direct, yt_remove
 
 STATIC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
 
@@ -68,6 +68,8 @@ class H(BaseHTTPRequestHandler):
             self.send(json.dumps(cover_candidates(q.get("q", [""])[0])))
         elif p == "/api/lyrics":
             self.send(json.dumps(get_lyrics(q.get("id", [""])[0], q.get("artist", [""])[0], q.get("title", [""])[0])))
+        elif p == "/api/yt_check":
+            self.send(json.dumps(yt_check(q.get("id", [""])[0])))
         elif p == "/api/yt_playlist":
             pl = yt_playlists.get(q.get("id", [""])[0])
             self.send(json.dumps(pl_public(pl, entries=True) if pl else {"error": _("não encontrado")}), code=200 if pl else 404)
