@@ -4,12 +4,12 @@ Radio Browser is a free, community-run catalog (no account or API key). Followin
 guidelines, the server is picked from the list behind all.api.radio-browser.info, requests
 send a descriptive User-Agent, and a "click" is reported when a station is played.
 """
-import os, random, socket, threading, time, urllib.parse
+import os, random, re, socket, threading, time, urllib.parse, urllib.request
 
 from . import db
 from .config import cfg
 from .state import lock, radios
-from .util import http_get
+from .util import UA, http_get
 
 FALLBACK_HOSTS = ["de1.api.radio-browser.info", "nl1.api.radio-browser.info", "at1.api.radio-browser.info"]
 MAX_RECENT = 12
@@ -65,7 +65,7 @@ def station_item(st):
     return {"id": "radio_" + uuid, "uuid": uuid, "radio": True,
             "title": (st.get("name") or "").strip() or uuid, "artist": "", "album": "radio_" + uuid,
             "dur": 0, "n": 0, "disc": 1, "fmt": (st.get("codec") or "").upper(), "q": f"{bitrate}k" if bitrate else "",
-            "path": st.get("url_resolved") or st.get("url"), "favicon": st.get("favicon") or "",
+            "path": st.get("url_resolved") or st.get("url"), "src": st.get("url") or "", "favicon": st.get("favicon") or "",
             "country": st.get("country") or "", "countrycode": (st.get("countrycode") or "").upper(),
             "tags": [t for t in (st.get("tags") or "").split(",") if t][:4], "hls": bool(st.get("hls"))}
 
@@ -139,15 +139,56 @@ def _find(uuid):
     return station_item(rows[0]) if rows else None
 
 
+def resolve_stream(url):
+    """Opens a playlist file (.pls/.m3u) and returns the first stream in it; other links are returned as they are.
+
+    Some stations publish a playlist that hands out a signed link valid for a few days (e.g. KBS, in Korea).
+    Radio Browser stores the link it found on its last check, which may already have expired (403), so the
+    playlist is read again each time the station is played."""
+    path = urllib.parse.urlsplit(url).path.lower()
+    if not path.endswith((".pls", ".m3u")):
+        return url
+    req = urllib.request.Request(url, headers={"User-Agent": UA})
+    with urllib.request.urlopen(req, timeout=6) as r:
+        text = r.read(65536).decode("utf-8", "replace")          # a playlist is small; never read a stream
+    for line in text.splitlines():
+        line = line.strip()
+        m = re.match(r"File\d+\s*=\s*(.+)", line, re.I) if path.endswith(".pls") else None
+        cand = m.group(1).strip() if m else (line if not path.endswith(".pls") and not line.startswith("#") else "")
+        if cand.startswith(("http://", "https://")):
+            return cand
+    return url
+
+
+def _fresh(it):
+    """The station with its current link: Radio Browser's latest data, with the playlist read again."""
+    try:
+        rows = rb_get("stations/byuuid", {"uuids": it["uuid"]}, timeout=6)
+        if rows:
+            it = {**it, **{k: v for k, v in station_item(rows[0]).items() if k in ("path", "src", "hls", "fmt", "q")}}
+    except Exception:
+        pass
+    if it.get("src"):
+        try:
+            it = {**it, "path": resolve_stream(it["src"])}
+        except Exception as e:
+            print("[rádio] playlist:", it["src"], e, flush=True)
+    return it
+
+
 def select(uuid):
     """Prepares a station to be played: registers it, adds it to "recent" and reports the click."""
     it = _find(uuid)
     if not it:
         return None
+    it = _fresh(it)
     with lock:
         radios[it["id"]] = it
     recent = [it] + [r for r in _stored("radio_recent") if r["uuid"] != uuid]
     db.kv_set("radio_recent", recent[:MAX_RECENT])
+    fav = _stored("radio_favorites")
+    if any(r["uuid"] == uuid for r in fav):                     # keep the favorite's link fresh too
+        db.kv_set("radio_favorites", [it if r["uuid"] == uuid else r for r in fav])
     threading.Thread(target=_click, args=(uuid,), daemon=True).start()
     return public(it)
 

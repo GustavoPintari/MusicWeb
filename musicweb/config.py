@@ -27,6 +27,8 @@ FILE_KEYS = {
     ("youtube", "max_history"): ("yt_max_history", int),
     ("youtube", "format"): ("yt_format", str),
     ("youtube", "playlist_max"): ("yt_playlist_max", int),
+    ("youtube", "pot_server"): ("yt_pot_server", str),
+    ("youtube", "pot_url"): ("yt_pot_url", str),
     ("cache", "dir"): ("cache_dir", str),
     ("data", "dir"): ("data_dir", str),
     ("history", "enabled"): ("history_enabled", bool),
@@ -76,6 +78,8 @@ class Config:
     yt_max_history: int = 50
     yt_playlist_max: int = 200               # videos read from a playlist link
     yt_format: str = "bestaudio[ext=m4a]/bestaudio[acodec^=mp4a]/bestaudio/best"   # m4a plays in every browser
+    yt_pot_server: str = "~/bgutil-ytdlp-pot-provider/server"   # PO token server started with MusicWeb; "" = don't start
+    yt_pot_url: str = "http://127.0.0.1:4416"   # where the PO token server answers
     cache_dir: str = "~/.cache/musicweb"     # disposable: covers, lyrics, YouTube history
     data_dir: str = "~/.local/share/musicweb"   # kept: SQLite database (scan cache, play history, queue)
     history_enabled: bool = True             # record plays for history / most played

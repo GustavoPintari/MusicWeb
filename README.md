@@ -110,6 +110,8 @@ The file is looked up in this order: `--config`, the `MUSICWEB_CONFIG` variable,
 | `[youtube] max_history` | `50` | videos kept in "Tocados recentemente" (recently played) |
 | `[youtube] format` | m4a / best audio | format requested from yt-dlp |
 | `[youtube] playlist_max` | `200` | videos read from a playlist link |
+| `[youtube] pot_server` | `~/bgutil-ytdlp-pot-provider/server` | PO token server started with MusicWeb (`""` = don't start) |
+| `[youtube] pot_url` | `http://127.0.0.1:4416` | where the PO token server answers |
 | `[player] resume_on_start` | `false` | after a restart, play the saved queue right away |
 | `[history] enabled` | `true` | record plays (history and most played) |
 | `[history] min_seconds` | `30` | listening time before a track counts as played (half the track if shorter) |
@@ -152,13 +154,25 @@ Requires `yt-dlp`. The audio goes through the server itself (`/api/stream/yt_<id
 If you see *"o YouTube pediu login para confirmar que não é um robô"* (YouTube asked to sign in to confirm you're not a bot):
 
 1. update yt-dlp: `pip install -U yt-dlp`;
-2. if it keeps happening, export your YouTube cookies ([how to](https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp)) and set `[youtube] cookies = "~/cookies.txt"`.
+2. install the PO token provider (below), which usually solves it without signing in;
+3. if it keeps happening, export your YouTube cookies ([how to](https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp)) and set `[youtube] cookies = "~/cookies.txt"`.
+
+The check depends mostly on the IP address: it is rare on home Wi-Fi or mobile data and common behind VPNs and cloud servers.
+
+**PO token (no cookies)**: [bgutil-ytdlp-pot-provider](https://github.com/Brainicism/bgutil-ytdlp-pot-provider) makes the "proof of origin" token YouTube asks for. It has a yt-dlp plugin and a small Node.js server. To install both (Node.js 22 or newer; on Termux the script installs it, plus what's needed to compile the `canvas` module):
+
+```sh
+./pot-setup.sh
+./musicweb.sh restart
+```
+
+MusicWeb starts the server together with itself (only on `127.0.0.1`, since it has no authentication), restarts it if it stops and stops it on exit; the startup log shows `PO token=sim`. If something already answers on `[youtube] pot_url` (for example the project's Docker image), that one is used. Run `./pot-setup.sh` again to update the plugin and the server together (they must be the same version). When Node.js is installed and Deno isn't, yt-dlp is also told to use Node.js as its JavaScript runtime (`--js-runtimes node`). A token helps but doesn't guarantee anything: if the IP itself is blocked, only cookies (or another network) help.
 
 ### Internet radio
 
 The 📻 button opens the station list, from [Radio Browser](https://www.radio-browser.info) — a free, community-run directory (no account or API key). Search by name, pick a country (all countries the first time; the last choice is remembered) and a genre, and star your favorites. The server picks a Radio Browser mirror, sends a descriptive User-Agent and reports a "click" when a station is played, as the project asks.
 
-On the Receiver, mpv plays the stream and shows the song on air (ICY metadata), which is also used to look up the lyrics. In the browser, most MP3/AAC streams play directly; HLS (`.m3u8`) streams may not play on desktop browsers. Radio is not counted in the history or the recap.
+On the Receiver, mpv plays the stream and shows the song on air (ICY metadata), which is also used to look up the lyrics. In the browser, MP3/AAC streams play directly and HLS (`.m3u8`) streams play natively or through [hls.js](https://github.com/video-dev/hls.js) (loaded only when needed). Stations that publish a playlist (`.pls`/`.m3u`) have it read again each time they are played, because some hand out links that expire after a few days. Radio is not counted in the history or the recap.
 
 ### Database
 
@@ -178,6 +192,7 @@ server.py               shortcut: python server.py
 config.example.toml     configuration template
 requirements.txt        Python dependencies (mutagen, yt-dlp)
 musicweb.sh             Termux control: start, stop, restart, status, log, install, boot on/off
+pot-setup.sh            installs/updates the YouTube PO token provider (plugin + Node.js server)
 musicweb/
 ├── app.py              startup (arguments, configuration, threads)
 ├── info.py             `musicweb.sh status` details
@@ -190,6 +205,7 @@ musicweb/
 ├── player.py           mpv control (queue, events, status, saved queue, play counting)
 ├── editor.py           tag editing and album removal
 ├── youtube.py          yt-dlp, direct links, playlists and history
+├── pot.py              YouTube PO token server (bgutil-ytdlp-pot-provider): start, restart, stop
 ├── radio.py            internet radio (Radio Browser): search, favorites, recent
 ├── retro.py            retrospective (recap) of a month or a year
 ├── lyrics.py           lyrics (.lrc, tags, LRCLIB)
@@ -199,7 +215,7 @@ musicweb/
 └── static/index.html   the page (HTML, CSS and JS in one file)
 ```
 
-Module dependencies (no cycles): `config` → `state`/`util`/`db` → `youtube`/`history`/`radio` → `covers` → `library` / `player` / `lyrics` / `retro` → `editor` → `web` → `app`.
+Module dependencies (no cycles): `config` → `state`/`util`/`db`/`pot` → `youtube`/`history`/`radio` → `covers` → `library` / `player` / `lyrics` / `retro` → `editor` → `web` → `app`.
 
 ### API
 
@@ -336,6 +352,8 @@ O arquivo é procurado nesta ordem: `--config`, variável `MUSICWEB_CONFIG`, `./
 | `[youtube] max_history` | `50` | vídeos guardados em "Tocados recentemente" |
 | `[youtube] format` | m4a / melhor áudio | formato pedido ao yt-dlp |
 | `[youtube] playlist_max` | `200` | vídeos lidos de um link de playlist |
+| `[youtube] pot_server` | `~/bgutil-ytdlp-pot-provider/server` | servidor de PO token iniciado com o MusicWeb (`""` = não iniciar) |
+| `[youtube] pot_url` | `http://127.0.0.1:4416` | onde o servidor de PO token responde |
 | `[player] resume_on_start` | `false` | depois de reiniciar, já toca a fila salva |
 | `[history] enabled` | `true` | registra as reproduções (histórico e mais tocadas) |
 | `[history] min_seconds` | `30` | tempo ouvindo até a música contar como tocada (metade da faixa, se for mais curta) |
@@ -378,13 +396,25 @@ Precisa do `yt-dlp`. O áudio passa pelo próprio servidor (`/api/stream/yt_<id>
 Se aparecer *"o YouTube pediu login para confirmar que não é um robô"*:
 
 1. atualize o yt-dlp: `pip install -U yt-dlp`;
-2. se continuar, exporte os cookies do YouTube ([como fazer](https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp)) e configure `[youtube] cookies = "~/cookies.txt"`.
+2. instale o gerador de PO token (abaixo), que costuma resolver sem login;
+3. se continuar, exporte os cookies do YouTube ([como fazer](https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp)) e configure `[youtube] cookies = "~/cookies.txt"`.
+
+O bloqueio depende principalmente do IP: é raro na Wi-Fi de casa ou nos dados móveis e comum atrás de VPN e servidores na nuvem.
+
+**PO token (sem cookies)**: o [bgutil-ytdlp-pot-provider](https://github.com/Brainicism/bgutil-ytdlp-pot-provider) gera o token de "prova de origem" que o YouTube pede. Ele tem um plugin do yt-dlp e um pequeno servidor em Node.js. Para instalar os dois (Node.js 22 ou mais novo; no Termux o script instala, junto com o necessário para compilar o módulo `canvas`):
+
+```sh
+./pot-setup.sh
+./musicweb.sh restart
+```
+
+O MusicWeb inicia o servidor junto com ele (só em `127.0.0.1`, porque o servidor não tem autenticação), reinicia se ele parar e encerra ao sair; o log de inicialização mostra `PO token=sim`. Se algo já responder em `[youtube] pot_url` (por exemplo a imagem Docker do projeto), esse é usado. Rode `./pot-setup.sh` de novo para atualizar plugin e servidor juntos (precisam ser da mesma versão). Com o Node.js instalado e sem o Deno, o yt-dlp também passa a usar o Node.js como JavaScript runtime (`--js-runtimes node`). O token ajuda, mas não garante: se o próprio IP estiver bloqueado, só os cookies (ou outra rede) resolvem.
 
 ### Rádios online
 
 O botão 📻 abre a lista de rádios, vinda do [Radio Browser](https://www.radio-browser.info) — um catálogo gratuito e comunitário (sem conta nem chave de API). Busque pelo nome, escolha o país (na primeira vez, todos os países; depois vale a última escolha) e o gênero, e marque as favoritas com ★. O servidor escolhe um espelho do Radio Browser, se identifica com um User-Agent e registra o "clique" ao tocar uma rádio, como o projeto pede.
 
-No Receiver, o mpv toca o stream e mostra a música no ar (metadados ICY), que também é usada para buscar a letra. No navegador, a maioria dos streams MP3/AAC toca direto; streams HLS (`.m3u8`) podem não tocar em navegadores de computador. Rádio não entra no histórico nem na retrospectiva.
+No Receiver, o mpv toca o stream e mostra a música no ar (metadados ICY), que também é usada para buscar a letra. No navegador, streams MP3/AAC tocam direto e streams HLS (`.m3u8`) tocam de forma nativa ou pelo [hls.js](https://github.com/video-dev/hls.js) (carregado só quando precisa). Rádios que publicam uma playlist (`.pls`/`.m3u`) têm a playlist lida de novo a cada vez que tocam, porque algumas entregam links que expiram em poucos dias. Rádio não entra no histórico nem na retrospectiva.
 
 ### Banco de dados
 
@@ -404,6 +434,7 @@ server.py               atalho: python server.py
 config.example.toml     modelo de configuração
 requirements.txt        dependências Python (mutagen, yt-dlp)
 musicweb.sh             controle no Termux: start, stop, restart, status, log, install, boot on/off
+pot-setup.sh            instala/atualiza o gerador de PO token do YouTube (plugin + servidor Node.js)
 musicweb/
 ├── app.py              inicialização (argumentos, configuração, threads)
 ├── info.py             detalhes do `musicweb.sh status`
@@ -416,6 +447,7 @@ musicweb/
 ├── player.py           controle do mpv (fila, eventos, status, fila salva, contagem de reproduções)
 ├── editor.py           edição de tags e remoção de álbuns
 ├── youtube.py          yt-dlp, links diretos, playlists e histórico
+├── pot.py              servidor de PO token do YouTube (bgutil-ytdlp-pot-provider): inicia, reinicia, encerra
 ├── radio.py            rádios online (Radio Browser): busca, favoritas, recentes
 ├── retro.py            retrospectiva de um mês ou de um ano
 ├── lyrics.py           letras (.lrc, tags, LRCLIB)
@@ -425,7 +457,7 @@ musicweb/
 └── static/index.html   a página (HTML, CSS e JS num arquivo só)
 ```
 
-Dependências entre módulos (sem ciclos): `config` → `state`/`util`/`db` → `youtube`/`history`/`radio` → `covers` → `library` / `player` / `lyrics` / `retro` → `editor` → `web` → `app`.
+Dependências entre módulos (sem ciclos): `config` → `state`/`util`/`db`/`pot` → `youtube`/`history`/`radio` → `covers` → `library` / `player` / `lyrics` / `retro` → `editor` → `web` → `app`.
 
 ### API
 

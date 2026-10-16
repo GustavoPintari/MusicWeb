@@ -22,10 +22,10 @@ EN = {
     # YouTube
     "yt-dlp não está instalado no servidor (pip install yt-dlp)": "yt-dlp is not installed on the server (pip install yt-dlp)",
     "o YouTube demorou demais para responder": "YouTube took too long to answer",
-    "o YouTube pediu login para confirmar que não é um robô. Atualize o yt-dlp (pip install -U yt-dlp) "
-    "ou configure [youtube] cookies no config.toml":
-        "YouTube asked to sign in to confirm you're not a bot. Update yt-dlp (pip install -U yt-dlp) "
-        "or set [youtube] cookies in config.toml",
+    "o YouTube pediu login para confirmar que não é um robô. Atualize o yt-dlp (pip install -U yt-dlp), "
+    "instale o gerador de PO token (./pot-setup.sh) ou configure [youtube] cookies no config.toml":
+        "YouTube asked to sign in to confirm you're not a bot. Update yt-dlp (pip install -U yt-dlp), "
+        "install the PO token provider (./pot-setup.sh) or set [youtube] cookies in config.toml",
     "este vídeo é privado ou não está disponível": "this video is private or unavailable",
     "não achei o áudio deste vídeo": "couldn't find the audio of this video",
     "Não reconheci esse link do YouTube": "That doesn't look like a YouTube link",

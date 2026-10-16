@@ -39,6 +39,9 @@ cookies = ""                  # path to a cookies.txt, in case YouTube asks to s
 max_history = 50              # videos kept in "Tocados recentemente"
 format = "bestaudio[ext=m4a]/bestaudio[acodec^=mp4a]/bestaudio/best"
 playlist_max = 200            # videos read from a playlist link
+# PO token (bgutil-ytdlp-pot-provider): passes the "not a bot" check without cookies. Install with ./pot-setup.sh
+pot_server = "~/bgutil-ytdlp-pot-provider/server"   # started together with MusicWeb; "" to not start it
+pot_url = "http://127.0.0.1:4416"                   # where the PO token server answers
 
 [cache]
 dir = "~/.cache/musicweb"     # disposable: covers, lyrics and YouTube history
