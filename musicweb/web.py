@@ -1,0 +1,269 @@
+"""Servidor HTTP: página, API JSON, streaming e downloads."""
+import json, os, re, urllib.error, urllib.parse, urllib.request, zipfile
+from http.server import BaseHTTPRequestHandler
+
+from .config import cfg
+from .covers import cover_candidates, cover_from_url, get_cover, set_cover
+from .editor import edit_album, remove_album
+from .library import library_json, scan
+from .lyrics import get_lyrics
+from .player import mpv_cmd, play_pos, status
+from .state import albums, lock, state, tracks, yt_items
+from .util import MIME, safe_name, sniff, zip_name
+from .youtube import yt_add, yt_direct, yt_remove
+
+STATIC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
+
+
+MAX_UPLOAD = 20 * 1024 * 1024
+
+
+class _Counter:
+    """Conta bytes escritos (zipfile precisa de tell() em fluxo não-pesquisável)."""
+    def __init__(self, w):
+        self.w, self.n = w, 0
+
+    def write(self, b):
+        self.w.write(b)
+        self.n += len(b)
+        return len(b)
+
+    def tell(self):
+        return self.n
+
+    def flush(self):
+        self.w.flush()
+
+
+class H(BaseHTTPRequestHandler):
+    def log_message(self, *a):
+        pass
+
+    def send(self, body, ctype="application/json; charset=utf-8", code=200, cache=False):
+        b = body if isinstance(body, bytes) else body.encode()
+        self.send_response(code)
+        self.send_header("Content-Type", ctype)
+        self.send_header("Content-Length", str(len(b)))
+        self.send_header("Cache-Control", "max-age=604800" if cache else "no-store")
+        self.end_headers()
+        self.wfile.write(b)
+
+    def do_GET(self):
+        p, _, qs = self.path.partition("?")
+        q = urllib.parse.parse_qs(qs)
+        if p == "/":
+            with open(os.path.join(STATIC, "index.html"), "rb") as fh:
+                self.send(fh.read(), "text/html; charset=utf-8")
+        elif p == "/api/library":
+            self.send(library_json())
+        elif p == "/api/status":
+            self.send(json.dumps(status()))
+        elif p == "/api/cover_search":
+            self.send(json.dumps(cover_candidates(q.get("q", [""])[0])))
+        elif p == "/api/lyrics":
+            self.send(json.dumps(get_lyrics(q.get("id", [""])[0], q.get("artist", [""])[0], q.get("title", [""])[0])))
+        elif p.startswith("/api/stream/yt_"):
+            self.yt_stream(p.rsplit("/", 1)[1], "dl" in q)
+        elif p.startswith("/api/stream/"):
+            self.stream(p.rsplit("/", 1)[1], "dl" in q)
+        elif p.startswith("/api/download/"):
+            self.download(p.rsplit("/", 1)[1])
+        elif p.startswith("/api/cover/"):
+            data = get_cover(p.rsplit("/", 1)[1])
+            if data:
+                self.send(data, sniff(data), cache=True)
+            else:
+                self.send(b"", "text/plain", 404)
+        else:
+            self.send("{}", code=404)
+
+    def stream(self, tid, attachment=False):
+        t = tracks.get(tid)
+        if not t or not os.path.isfile(t["path"]):
+            return self.send("{}", code=404)
+        size = os.path.getsize(t["path"])
+        start, end = 0, size - 1
+        m = re.match(r"bytes=(\d*)-(\d*)", self.headers.get("Range", ""))
+        if m and (m.group(1) or m.group(2)):
+            if m.group(1):
+                start = int(m.group(1))
+                end = min(int(m.group(2)), size - 1) if m.group(2) else size - 1
+            else:                                   # "bytes=-500": últimos 500 bytes
+                start = max(0, size - int(m.group(2)))
+            if start > end:
+                self.send_response(416)
+                self.send_header("Content-Range", f"bytes */{size}")
+                self.end_headers()
+                return
+            self.send_response(206)
+            self.send_header("Content-Range", f"bytes {start}-{end}/{size}")
+        else:
+            self.send_response(200)
+        ext = os.path.splitext(t["path"])[1].lower()
+        self.send_header("Content-Type", MIME.get(ext, "application/octet-stream"))
+        self.send_header("Accept-Ranges", "bytes")
+        self.send_header("Content-Length", str(end - start + 1))
+        if attachment:
+            fname = os.path.basename(t["path"])
+            self.send_header("Content-Disposition", "attachment; filename*=UTF-8''" + urllib.parse.quote(fname))
+        self.end_headers()
+        try:
+            with open(t["path"], "rb") as fh:
+                fh.seek(start)
+                left = end - start + 1
+                while left > 0:
+                    chunk = fh.read(min(65536, left))
+                    if not chunk:
+                        break
+                    self.wfile.write(chunk)
+                    left -= len(chunk)
+        except (BrokenPipeError, ConnectionResetError):
+            pass                                    # o navegador cancelou (normal ao pular trechos)
+
+    def yt_stream(self, tid, attachment=False):
+        """Repassa o áudio do YouTube (com Range, para poder pular trechos)."""
+        if tid not in yt_items:
+            return self.send("{}", code=404)
+        r = None
+        for attempt in range(2):                     # na 2ª tentativa pede um link novo (o antigo expirou)
+            try:
+                url, headers, _ = yt_direct(tid, force=attempt > 0)
+            except Exception as e:
+                return self.send(json.dumps({"error": str(e)}), code=502)
+            h = dict(headers)
+            if self.headers.get("Range"):
+                h["Range"] = self.headers["Range"]
+            try:
+                r = urllib.request.urlopen(urllib.request.Request(url, headers=h), timeout=20)
+                break
+            except urllib.error.HTTPError as e:
+                if e.code == 416:
+                    self.send_response(416)
+                    if e.headers.get("Content-Range"):
+                        self.send_header("Content-Range", e.headers["Content-Range"])
+                    self.end_headers()
+                    return
+                if attempt == 1:
+                    return self.send("{}", code=502)
+            except Exception:
+                if attempt == 1:
+                    return self.send("{}", code=502)
+        with r:
+            ctype = r.headers.get("Content-Type", "audio/mp4")
+            self.send_response(r.status)
+            self.send_header("Content-Type", ctype)
+            for k in ("Content-Length", "Content-Range"):
+                if r.headers.get(k):
+                    self.send_header(k, r.headers[k])
+            self.send_header("Accept-Ranges", "bytes")
+            if attachment:
+                fname = safe_name(yt_items[tid]["title"]) + (".webm" if "webm" in ctype else ".m4a")
+                self.send_header("Content-Disposition", "attachment; filename*=UTF-8''" + urllib.parse.quote(fname))
+            self.end_headers()
+            try:
+                while True:
+                    chunk = r.read(65536)
+                    if not chunk:
+                        break
+                    self.wfile.write(chunk)
+            except OSError:
+                pass                                 # o navegador/mpv cancelou (normal ao pular trechos)
+
+    def download(self, aid):
+        with lock:
+            a = albums.get(aid)
+            files = [tracks[t]["path"] for t in a["tracks"]] if a else []
+        if not a:
+            return self.send("{}", code=404)
+        folder = zip_name(f"{a['artist']} - {a['full']}")
+        self.send_response(200)
+        self.send_header("Content-Type", "application/zip")
+        self.send_header("Content-Disposition", "attachment; filename*=UTF-8''" + urllib.parse.quote(folder + ".zip"))
+        self.send_header("Connection", "close")
+        self.end_headers()
+        base = os.path.realpath(a["dir"])
+        try:
+            # ZIP_STORED: áudio já é comprimido, e assim o celular não gasta CPU
+            with zipfile.ZipFile(_Counter(self.wfile), "w", zipfile.ZIP_STORED, allowZip64=True) as z:
+                for f in files:
+                    rel = os.path.relpath(f, base) if f.startswith(base + os.sep) else os.path.basename(f)
+                    z.write(f, f"{folder}/{rel}")
+                cover = get_cover(aid)
+                if cover:
+                    ext = {"image/png": ".png", "image/webp": ".webp"}.get(sniff(cover), ".jpg")
+                    z.writestr(f"{folder}/cover{ext}", cover)
+        except (BrokenPipeError, ConnectionResetError):
+            pass
+
+    def do_POST(self):
+        n = int(self.headers.get("Content-Length") or 0)
+        p, _, qs = self.path.partition("?")
+        if p == "/api/cover_upload":                 # corpo = a imagem em si
+            if n > MAX_UPLOAD:
+                return self.send('{"ok":false,"error":"imagem grande demais"}', code=413)
+            data = self.rfile.read(n)
+            try:
+                set_cover(urllib.parse.parse_qs(qs).get("album", [""])[0], data)
+                return self.send('{"ok":true}')
+            except Exception as e:
+                return self.send(json.dumps({"ok": False, "error": str(e)}))
+        try:
+            body = json.loads(self.rfile.read(n)) if n else {}
+        except ValueError:
+            body = {}
+        p = self.path
+        if p == "/api/play":
+            with lock:
+                if body.get("album") in albums:
+                    queue, pos = albums[body["album"]]["tracks"], 0
+                elif body.get("id") in tracks:
+                    queue = albums[tracks[body["id"]]["album"]]["tracks"]
+                    pos = queue.index(body["id"])
+                elif body.get("id") in yt_items:
+                    queue, pos = [body["id"]], 0
+                else:
+                    return self.send('{"error":"não encontrado"}', code=404)
+                state["queue"] = list(queue)
+            play_pos(pos, float(body.get("t") or 0))
+        elif p == "/api/pause":
+            mpv_cmd(["set_property", "pause", True])
+        elif p == "/api/resume":
+            mpv_cmd(["set_property", "pause", False])
+        elif p == "/api/stop":
+            state["active"] = False
+            mpv_cmd(["stop"])
+        elif p == "/api/next":
+            play_pos(state["pos"] + 1)
+        elif p == "/api/prev":
+            t = mpv_cmd(["get_property", "time-pos"])[0] or 0
+            if t > 5:                                    # como num player comum: volta ao início
+                mpv_cmd(["seek", 0, "absolute"])
+            else:
+                play_pos(max(0, state["pos"] - 1))
+        elif p == "/api/seek":
+            mpv_cmd(["seek", float(body.get("t", 0)), "absolute"])
+        elif p == "/api/volume":
+            if "delta" in body:
+                v = (mpv_cmd(["get_property", "volume"])[0] or 100) + float(body["delta"])
+            else:
+                v = float(body.get("v", 100))
+            mpv_cmd(["set_property", "volume", max(0, min(100, v))])
+        elif p == "/api/rescan":
+            scan(cfg.root)
+        elif p == "/api/edit":
+            return self.send(json.dumps(edit_album(body)))
+        elif p == "/api/cover_set":
+            try:
+                set_cover(body.get("album", ""), cover_from_url(body.get("url", "")))
+                return self.send('{"ok":true}')
+            except Exception as e:
+                return self.send(json.dumps({"ok": False, "error": str(e)}))
+        elif p == "/api/delete":
+            return self.send(json.dumps(remove_album(body.get("album", ""), bool(body.get("permanent")))))
+        elif p == "/api/yt":
+            return self.send(json.dumps(yt_add(body.get("url", ""))))
+        elif p == "/api/yt_remove":
+            return self.send(json.dumps(yt_remove(body.get("id", ""))))
+        else:
+            return self.send("{}", code=404)
+        self.send(json.dumps(status()))
