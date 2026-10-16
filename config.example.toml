@@ -1,0 +1,31 @@
+# Configuração do musicweb.
+# Copie para config.toml (nesta pasta) ou ~/.config/musicweb/config.toml e ajuste.
+# Tudo é opcional: o que ficar de fora usa o valor padrão mostrado aqui.
+# Variáveis de ambiente (MPV_AO, PLAYER_NAME, ...) e a linha de comando têm prioridade sobre este arquivo.
+
+[server]
+host = "0.0.0.0"              # "0.0.0.0" = aceita conexões de outros aparelhos da rede
+port = 8080
+player_name = "Receiver"      # nome da saída de áudio do celular, mostrado na página
+
+[library]
+music_dir = "~/storage/music"
+rescan_every = 60             # segundos entre buscas por músicas novas (0 desliga)
+trash_dir = ""                # vazio = pasta .musicweb-lixeira ao lado da biblioteca
+
+[mpv]
+audio_output = "opensles"     # saída de áudio do mpv (--ao)
+
+[covers]
+online = true                 # busca capas no iTunes / MusicBrainz quando não há capa local
+
+[lyrics]
+online = true                 # busca letras no LRCLIB quando não há .lrc nem letra nas tags
+
+[youtube]
+cookies = ""                  # caminho de um cookies.txt, se o YouTube pedir login ("não sou um robô")
+max_history = 50              # quantos vídeos ficam em "Tocados recentemente"
+format = "bestaudio[ext=m4a]/bestaudio[acodec^=mp4a]/bestaudio/best"
+
+[cache]
+dir = "~/.cache/musicweb"     # capas, letras e histórico do YouTube
