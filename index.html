@@ -137,12 +137,38 @@ a.btn2:active{transform:scale(.92);filter:brightness(1.35)}
 #volpop span{min-width:40px;text-align:right;color:var(--mut);font-size:13px;font-variant-numeric:tabular-nums}
 #vol.on{color:var(--ac)}
 .empty{color:var(--mut);text-align:center;margin-top:40px}
+
+/* letra */
+.orr{display:flex;align-items:center;gap:8px}
+#lyb{font-size:12px;padding:5px 10px;border-radius:14px;background:var(--card);color:var(--mut)}
+#lyb.on{color:var(--ac);background:#16283a}
+.lyh{display:flex;gap:12px;align-items:center;margin:4px 0 18px}
+.lyh .cv{width:64px;flex:none;font-size:22px;border-radius:6px}
+.lyh div:last-child{min-width:0}.lyh b,.lyh small{display:block;overflow:hidden;text-overflow:ellipsis}
+.lyh small{color:var(--mut);font-size:14px}
+.ly p{margin:0;padding:6px 4px;font-size:22px;font-weight:700;line-height:1.3;color:#5c5c5c;cursor:pointer;border-radius:8px;
+  transition:color .25s}
+.ly p.past{color:#8a8a8a}.ly p.on{color:var(--fg)}
+.ly p:active{background:var(--card)}
+.ly.plain{white-space:pre-line;font-size:18px;font-weight:500;line-height:1.55;color:var(--fg)}
+.lysrc{color:var(--mut);font-size:12px;margin-top:24px}.lysrc a{color:var(--ac)}
+
+/* YouTube */
+#ytsh h1{font-size:22px;margin:4px 0 6px}
+#ytsh .note{color:var(--mut);font-size:13px;margin:0 0 14px}
+#ytf{display:flex;gap:8px;flex-wrap:wrap}
+#ytu{flex:1 1 220px;min-width:0;padding:11px 12px;border-radius:10px;border:1px solid #333;background:var(--card);color:var(--fg);font:inherit}
+#ytu:focus{outline:none;border-color:var(--ac)}
+#yterr{color:var(--err);font-size:13px;margin-top:8px}
+.t .yth{width:68px;aspect-ratio:16/9;flex:none;font-size:16px;border-radius:5px}
+.t .x{background:none;color:var(--mut);padding:6px 8px;flex:none}
 @media (max-width:520px){#st{display:none}}
 </style></head><body>
 
 <header>
   <input id="q" placeholder="Buscar álbum, artista ou faixa…" autocomplete="off">
   <div class="seg"><button data-v="albums">Álbuns</button><button data-v="artists">Artistas</button></div>
+  <button id="ytb" title="Tocar do YouTube"><svg viewBox="0 0 24 24"><path d="M21.6 7.2a2.5 2.5 0 0 0-1.8-1.8C18.2 5 12 5 12 5s-6.2 0-7.8.4a2.5 2.5 0 0 0-1.8 1.8C2 8.8 2 12 2 12s0 3.2.4 4.8a2.5 2.5 0 0 0 1.8 1.8c1.6.4 7.8.4 7.8.4s6.2 0 7.8-.4a2.5 2.5 0 0 0 1.8-1.8c.4-1.6.4-4.8.4-4.8s0-3.2-.4-4.8zM10 15V9l5.2 3L10 15z"/></svg></button>
   <button id="rs" title="Reescanear biblioteca"><svg viewBox="0 0 24 24"><path d="M17.65 6.35A7.96 7.96 0 0 0 12 4a8 8 0 1 0 7.73 10h-2.08A6 6 0 1 1 12 6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg></button>
 </header>
 <main id="lib"></main>
@@ -151,7 +177,7 @@ a.btn2:active{transform:scale(.92);filter:brightness(1.35)}
 
 <div id="toast"></div>
 <div id="bar">
-  <div id="outrow"><button id="out"></button><span id="nowfmt"></span></div>
+  <div id="outrow"><button id="out"></button><div class="orr"><span id="nowfmt"></span><button id="lyb" title="Letra da música">🎤 Letra</button></div></div>
   <div id="pg"><span id="tc"></span><div id="prog"><div class="tr"><div class="fl"></div></div></div><span id="td"></span></div>
   <div class="pl">
     <div id="now"></div>
@@ -227,6 +253,8 @@ function render(){
 
 let editing=false;
 function renderSheet(){
+  if(openAlbum==="@yt")return renderYT();
+  if(openAlbum==="@ly")return renderLyrics();
   const a=byId[openAlbum];if(!a)return;
   if(editing)return renderEdit(a);
   const af=albumFmt(a),tot=a.tracks.reduce((s,t)=>s+(t.dur||0),0),discs=new Set(a.tracks.map(t=>t.disc)).size>1;let lastDisc=null;
@@ -285,6 +313,85 @@ async function saveEdit(btn){
   }catch(e){$("#e_err").textContent="Sem conexão com o servidor"}
   finally{btn.classList.remove("busy");btn.disabled=false}
 }
+
+// ---------- YouTube: cada vídeo vira uma "faixa" sozinha num "álbum" de mesmo id
+let ytList=[];const ytKnown={};
+function regYT(y){
+  const t={id:y.id,title:y.title,artist:y.artist,dur:y.dur,fmt:y.fmt,q:y.q,n:0,disc:1};
+  const a={id:y.id,name:y.title,full:y.title,artist:y.artist,year:"",cv:0,yt:true,tracks:[t]};
+  trackById[y.id]={t,a};return a;
+}
+function renderYT(){
+  if(!$("#ytsh"))$("#sheetBody").innerHTML=`<div id="ytsh"><h1>YouTube</h1>
+    <p class="note">Cole o link de um vídeo para tocar só o áudio.</p>
+    <form id="ytf"><input id="ytu" type="url" inputmode="url" placeholder="https://youtu.be/…" autocomplete="off" enterkeyhint="go">
+      <button class="big" id="ytgo">${PLAY} Tocar</button></form><div id="yterr"></div><div id="ytr"></div></div>`;
+  $("#ytr").innerHTML=ytList.length?`<div class="disc">Tocados recentemente</div>`+ytList.map(a=>{const t=a.tracks[0];
+    return `<div class="t" data-t="${t.id}"><span class="n"></span>${cover(a,"yth")}<span class="ti">${esc(t.title)}<small>${esc(t.artist)}</small></span><span class="d">${t.dur?fmt(t.dur):""}</span><button class="x" data-x="${t.id}" title="Tirar do histórico">✕</button></div>`}).join(""):"";
+  markPlaying();
+}
+async function playYT(){
+  const u=$("#ytu").value.trim(),b=$("#ytgo");if(!u)return;
+  b.classList.add("busy");b.disabled=true;$("#yterr").textContent="";navigator.vibrate?.(10);
+  try{
+    const r=await (await fetch("/api/yt",{method:"POST",body:JSON.stringify({url:u})})).json();
+    if(!r.ok){$("#yterr").textContent=r.error||"Não consegui abrir esse vídeo";return}
+    ytKnown[r.item.id]=r.item;const a=regYT(r.item);ytList=[a,...ytList.filter(x=>x.id!==a.id)];
+    $("#ytu").value="";renderYT();
+    await ctl.playTrack(r.item.id);
+  }catch(e){$("#yterr").textContent="Sem conexão com o servidor"}
+  finally{b.classList.remove("busy");b.disabled=false}
+}
+async function removeYT(id){
+  ytList=ytList.filter(a=>a.id!==id);renderYT();
+  try{await fetch("/api/yt_remove",{method:"POST",body:JSON.stringify({id})})}catch(e){}
+}
+
+// ---------- letra da música que está tocando
+let LY={tid:null},lyUserScroll=0;
+function parseLRC(s){
+  const out=[];
+  for(const line of s.split(/\r?\n/)){
+    const tags=[...line.matchAll(/\[(\d+):(\d+(?:[.:]\d+)?)\]/g)];if(!tags.length)continue;
+    const text=line.replace(/\[[^\]]*\]/g,"").trim();
+    for(const m of tags)out.push({t:+m[1]*60+parseFloat(m[2].replace(":",".")),text});
+  }
+  return out.sort((a,b)=>a.t-b.t);
+}
+const lyForm=(ar,ti)=>`<form id="lyf" class="ed"><label>Artista</label><input id="lya" value="${esc(ar)}">
+  <label>Música</label><input id="lyt" value="${esc(ti)}"><div class="acts" style="margin-top:12px"><button class="big">Buscar letra</button></div></form>`;
+function renderLyrics(force){
+  const tr=S.track;
+  if(!tr){LY={tid:null};$("#sheetBody").innerHTML=`<p class="empty">Nada tocando.</p>`;return}
+  if(!force&&LY.tid===tr.id&&$("#lyv"))return;
+  LY={tid:tr.id,lines:null,idx:-1};
+  const a=byId[tr.album]||trackById[tr.id]?.a||{id:tr.album,name:tr.album_name,artist:""};
+  $("#sheetBody").innerHTML=`<div id="lyv"><div class="lyh">${cover(a,"",true)}<div><b>${esc(tr.title)}</b><small>${esc(tr.artist||tr.album_artist)}</small></div></div>
+    <div id="lyc"><p class="empty">Buscando letra…</p></div></div>`;
+  fetchLyrics(tr.id);
+}
+async function fetchLyrics(tid,artist,title){
+  const p=new URLSearchParams({id:tid});if(artist!=null){p.set("artist",artist);p.set("title",title)}
+  let r;try{r=await (await fetch("/api/lyrics?"+p)).json()}catch(e){r={ok:false,error:"Sem conexão com o servidor"}}
+  if(LY.tid!==tid||openAlbum!=="@ly")return;
+  LY.lines=null;LY.idx=-1;
+  const form=lyForm(r.artist??S.track?.artist??"",r.title??S.track?.title??"");
+  let h;
+  if(r.ok&&r.synced){LY.lines=parseLRC(r.synced);h=`<div class="ly">${LY.lines.map((l,i)=>`<p data-i="${i}">${esc(l.text)||"♪"}</p>`).join("")}</div>`}
+  else if(r.ok&&r.plain)h=`<div class="ly plain">${esc(r.plain)}</div>`;
+  else if(r.ok&&r.instrumental)h=`<p class="empty">♪ Instrumental</p>`;
+  else h=`<p class="empty">${esc(r.error||"Não encontrei a letra desta música.")}</p><p class="empty" style="margin-top:6px">Confira o nome e tente de novo:</p>`;
+  h+=r.ok?`<p class="lysrc">Letra: ${esc(r.src)}${r.synced?" · sincronizada (toque numa linha para pular até ela)":""} · <a href="#" id="lyre">Letra errada? Buscar outra</a></p><div id="lyfw" hidden>${form}</div>`:form;
+  $("#lyc").innerHTML=h;tick();
+}
+function lyTick(t){
+  if(openAlbum!=="@ly"||!LY.lines||S.track?.id!==LY.tid)return;
+  let i=-1;for(let k=0;k<LY.lines.length;k++){if(LY.lines[k].t<=t+.25)i=k;else break}
+  if(i===LY.idx)return;LY.idx=i;
+  document.querySelectorAll(".ly p").forEach((p,k)=>{p.classList.toggle("on",k===i);p.classList.toggle("past",k<i)});
+  if(i>=0&&performance.now()-lyUserScroll>4000)document.querySelector(`.ly p[data-i="${i}"]`)?.scrollIntoView({behavior:"smooth",block:"center"});
+}
+["touchmove","wheel"].forEach(ev=>$("#sheet").addEventListener(ev,()=>lyUserScroll=performance.now(),{passive:true}));
 
 function toast(msg,ms=3500){const t=$("#toast");t.textContent=msg;t.classList.add("show");clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove("show"),ms)}
 
@@ -362,11 +469,12 @@ function show(s){
   $("#pp").innerHTML=s.state==="playing"?PAUSE:PLAY;
   $("#err").textContent=s.error||"";
   if(s.track?.id!==prevId){
-    const a=s.track&&byId[s.track.album];
+    const a=s.track&&(byId[s.track.album]||trackById[s.track.id]?.a);
     $("#now").innerHTML=s.track?`${cover(a||{id:s.track.album,name:s.track.album_name,artist:""},"",true)}<div class="tx"><b>${esc(s.track.title)}</b><small>${esc(s.track.artist||s.track.album_artist)} — ${esc(s.track.album_name)}</small></div>`:`<div class="tx"><small>Nada tocando</small></div>`;
     document.title=s.track?`${s.track.title} — Música`:"Música";
     $("#nowfmt").innerHTML=s.track?fmtBadge(s.track.fmt,s.track.q):"";
     if(mode==="local")mediaMeta();
+    if(openAlbum==="@ly")renderLyrics();
   }
   if(mode==="remote"&&s.lib!=null&&libVer!=null&&s.lib!==libVer){libVer=s.lib;load()}
   if(s.volume!=null&&!volDragging){$("#vr").value=s.volume;$("#vl").textContent=s.volume+"%"}
@@ -377,6 +485,7 @@ function tick(){
   let t=S.time||0;if(S.state==="playing")t+=(performance.now()-recvAt)/1000;
   if(mode==="local")t=au.currentTime||0;
   const d=S.dur||0;t=d?Math.min(t,d):t;
+  lyTick(t);
   $("#prog .fl").style.width=d&&S.track?(t/d*100)+"%":"0";
   $("#tc").textContent=S.track?fmt(t):"";$("#td").textContent=S.track&&d?fmt(d):"";
 }
@@ -393,7 +502,7 @@ function localStatus(){
   const st=!ti?"stopped":(!au.paused?"playing":(au.ended?"stopped":"paused"));
   return {state:st,time:au.currentTime||0,dur:isFinite(au.duration)&&au.duration?au.duration:(ti?ti.t.dur:0),
     volume:Math.round(au.volume*100),error:L.err,
-    track:ti&&{id:ti.t.id,title:ti.t.title,artist:ti.t.artist,album:ti.a.id,album_name:ti.a.name,album_artist:ti.a.artist,fmt:ti.t.fmt,q:ti.t.q}};
+    track:ti&&{id:ti.t.id,title:ti.t.title,artist:ti.t.artist,album:ti.a.id,album_name:ti.a.yt?"YouTube":ti.a.name,album_artist:ti.a.artist,fmt:ti.t.fmt,q:ti.t.q}};
 }
 const lshow=()=>{if(mode==="local")show(localStatus())};
 
@@ -488,11 +597,19 @@ $("#lib").onclick=e=>{
   const al=e.target.closest(".al");if(al){openSheet(al.dataset.a);return}
   const ar=e.target.closest(".ar>button");if(ar){const box=ar.parentNode,n=box.dataset.ar;box.classList.toggle("open");box.classList.contains("open")?openArtists.add(n):openArtists.delete(n)}
 };
-function openSheet(id){openAlbum=id;renderSheet();$("#sheet").scrollTop=0;$("#sheet").classList.add("open");history.pushState({sheet:1},"")}
-function closeSheet(){$("#sheet").classList.remove("open");openAlbum=null;editing=false}
+function openSheet(id){
+  const wasOpen=$("#sheet").classList.contains("open");
+  openAlbum=id;editing=false;renderSheet();$("#sheet").scrollTop=0;$("#sheet").classList.add("open");
+  if(!wasOpen)history.pushState({sheet:1},"");
+  $("#lyb").classList.toggle("on",id==="@ly");
+}
+function closeSheet(){$("#sheet").classList.remove("open");openAlbum=null;editing=false;$("#lyb").classList.remove("on")}
 $("#back").onclick=()=>history.back();
 window.onpopstate=closeSheet;
 $("#sheetBody").onclick=e=>{
+  const x=e.target.closest("[data-x]");if(x){removeYT(x.dataset.x);return}
+  if(e.target.closest("#lyre")){e.preventDefault();const w=$("#lyfw");w.hidden=!w.hidden;if(!w.hidden)w.scrollIntoView({behavior:"smooth",block:"center"});return}
+  const lp=e.target.closest(".ly p[data-i]");if(lp&&S.track?.id===LY.tid){ctl.seek(LY.lines[+lp.dataset.i].t);lyUserScroll=0;return}
   if(e.target.closest("#editAlbum")){editing=true;renderSheet();$("#sheet").scrollTop=0;return}
   if(e.target.closest("#e_cancel")){editing=false;renderSheet();return}
   if(e.target.closest("#e_find")){const cs=$("#cs");cs.classList.toggle("open");if(cs.classList.contains("open")&&!$("#csr").children.length)searchCovers();return}
@@ -506,8 +623,15 @@ $("#sheetBody").onclick=e=>{
   const t=e.target.closest(".t");if(t){t.classList.add("busy");Promise.resolve(ctl.playTrack(t.dataset.t)).finally(()=>t.classList.remove("busy"))}
 };
 $("#sheetBody").onchange=e=>{if(e.target.id==="e_file"&&e.target.files[0])uploadCover(e.target.files[0])};
-$("#sheetBody").onsubmit=e=>{if(e.target.id==="csf"){e.preventDefault();searchCovers()}};
-$("#now").onclick=()=>{if(S.track&&!$("#sheet").classList.contains("open"))openSheet(S.track.album)};
+$("#sheetBody").onsubmit=e=>{
+  if(e.target.id==="csf"){e.preventDefault();searchCovers()}
+  if(e.target.id==="ytf"){e.preventDefault();playYT()}
+  if(e.target.id==="lyf"){e.preventDefault();e.target.querySelector("button").classList.add("busy");
+    fetchLyrics(LY.tid,$("#lya").value.trim(),$("#lyt").value.trim())}
+};
+$("#now").onclick=()=>{if(S.track&&!$("#sheet").classList.contains("open"))openSheet(byId[S.track.album]?S.track.album:"@yt")};
+$("#ytb").onclick=()=>{openSheet("@yt");$("#ytu").focus()};
+$("#lyb").onclick=()=>{navigator.vibrate?.(10);if(openAlbum==="@ly")history.back();else openSheet("@ly")};
 $("#pp").onclick=e=>ctl.toggle(e.currentTarget);
 $("#nx").onclick=e=>ctl.next(e.currentTarget);
 $("#pv").onclick=e=>ctl.prev(e.currentTarget);
@@ -528,7 +652,9 @@ async function load(){
   const d=await (await fetch("/api/library")).json();libVer=d.lib;
   if(d.api!==2){$("#lib").innerHTML=`<p class="empty" style="color:var(--err)">O server.py no celular está desatualizado.<br>Copie a versão nova e reinicie o servidor.</p>`;return}
   lib=d.albums;byId={};trackById={};playerName=d.player||"Receiver";renderOut();
-  lib.forEach(a=>{byId[a.id]=a;a.tracks.forEach(t=>trackById[t.id]={t,a})});render();if(openAlbum&&!editing)renderSheet();   // não apaga um formulário em edição
+  lib.forEach(a=>{byId[a.id]=a;a.tracks.forEach(t=>trackById[t.id]={t,a})});
+  (d.yt||[]).forEach(y=>ytKnown[y.id]=y);Object.values(ytKnown).forEach(regYT);   // mantém o que está tocando mesmo se sair do histórico
+  ytList=(d.yt||[]).map(y=>trackById[y.id].a);render();if(openAlbum&&!editing)renderSheet();   // não apaga um formulário em edição
 }
 async function poll(){
   try{

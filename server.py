@@ -5,14 +5,18 @@ Uso: python server.py [PASTA_DE_MUSICAS] [--port 8080]
 
 Só usa a biblioteca padrão. Com o `mutagen` instalado (pip install mutagen),
 lê as tags (álbum, artista, faixa, ano, duração) e as capas embutidas.
+Com o `yt-dlp` instalado (pip install yt-dlp), toca o áudio de links do YouTube.
+
+Letras: arquivo .lrc ao lado da música, tags da música ou LRCLIB (lrclib.net).
 
 Variáveis de ambiente:
   MPV_AO=opensles      saída de áudio do mpv
   COVERS_ONLINE=0      não busca capas na internet (MusicBrainz / iTunes)
   RESCAN_EVERY=60      a cada quantos segundos procura músicas novas (0 desliga)
   PLAYER_NAME=Receiver nome da saída de áudio do celular, mostrado na página
+  YT_COOKIES=arquivo   cookies.txt do YouTube, se ele pedir login ("não sou um robô")
 """
-import argparse, base64, hashlib, itertools, json, os, re, shutil, socket, subprocess, tempfile, threading, time, zipfile
+import argparse, base64, hashlib, importlib.util, itertools, json, os, re, shutil, socket, subprocess, sys, tempfile, threading, time, zipfile
 import urllib.error, urllib.parse, urllib.request
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 
@@ -30,6 +34,7 @@ CACHE = os.path.expanduser("~/.cache/musicweb/covers")
 HERE = os.path.dirname(os.path.abspath(__file__))
 UA = "musicweb/1.0 (self-hosted personal music player)"
 PLAYER_NAME = os.environ.get("PLAYER_NAME", "Receiver")
+PORT, LOCAL_HOST = 8080, "127.0.0.1"           # definidos de novo no início, conforme --port/--host
 MIME = {".mp3": "audio/mpeg", ".flac": "audio/flac", ".m4a": "audio/mp4", ".aac": "audio/aac", ".ogg": "audio/ogg",
         ".opus": "audio/ogg", ".wav": "audio/wav", ".wma": "audio/x-ms-wma"}
 
@@ -185,7 +190,13 @@ def library_json():
                         "cv": cover_ver.get(a["id"], 0),
                         "tracks": [{k: tracks[i][k] for k in ("id", "title", "artist", "n", "disc", "dur", "fmt", "q")}
                                    for i in a["tracks"]]})
-    return json.dumps({"api": 2, "lib": state["lib"], "player": PLAYER_NAME, "albums": out})
+        yt = [yt_public(y) for y in reversed(list(yt_items.values()))]
+    return json.dumps({"api": 2, "lib": state["lib"], "player": PLAYER_NAME, "albums": out, "yt": yt})
+
+
+def item(tid):
+    """Faixa da biblioteca ou vídeo do YouTube."""
+    return tracks.get(tid) or yt_items.get(tid)
 
 
 # ---------------------------------------------------------------- capas
@@ -379,6 +390,8 @@ def cover_online(a):
 
 
 def get_cover(aid):
+    if aid in yt_items:
+        return yt_thumb(aid)
     a = albums.get(aid)
     if not a:
         return None
@@ -500,9 +513,20 @@ def play_pos(pos, start=0):
             return
         state["pos"] = pos
         state["active"] = True
-        path = tracks[state["queue"][pos]]["path"]
-    mpv_start()
+        it = item(state["queue"][pos])
+        if it is None:
+            state["active"] = False
+            return
+        # vídeos do YouTube passam pelo próprio servidor (/api/stream), que renova o link quando expira
+        path = it.get("path") or f"http://{LOCAL_HOST}:{PORT}/api/stream/{it['id']}"
     state["error"] = ""
+    if not it.get("path"):
+        try:
+            yt_direct(it["id"])                    # já deixa o link pronto e mostra o erro, se houver
+        except Exception as e:
+            state["error"], state["active"] = f"YouTube: {e}", False
+            return
+    mpv_start()
     state["seek"] = start if start and start > 1 else None
     mpv_cmd(["loadfile", path, "replace"], ["set_property", "pause", False])
 
@@ -514,17 +538,18 @@ def status():
     with lock:
         cur = None
         if state["active"] and 0 <= state["pos"] < len(state["queue"]):
-            cur = tracks.get(state["queue"][state["pos"]])
+            cur = item(state["queue"][state["pos"]])
         if cur is None or idle in (True, None):
             st = "stopped"
         else:
             st = "paused" if paused else "playing"
+        alb = cur and albums.get(cur["album"])
         return {"state": st, "pos": state["pos"], "total": len(state["queue"]),
                 "time": t or 0, "dur": dur or (cur["dur"] if cur else 0), "error": state["error"],
                 "volume": round(vol) if vol is not None else None, "lib": state["lib"],
                 "track": cur and {**{k: cur[k] for k in ("id", "title", "artist", "album", "fmt", "q")},
-                                  "album_name": albums[cur["album"]]["name"],
-                                  "album_artist": albums[cur["album"]]["artist"]}}
+                                  "album_name": alb["name"] if alb else "YouTube",
+                                  "album_artist": alb["artist"] if alb else cur["artist"]}}
 
 
 # ---------------------------------------------------------------- atualização automática
@@ -743,6 +768,305 @@ def remove_album(aid, permanent=False):
     return {"ok": not errors, "errors": errors, "trash": dest}
 
 
+# ---------------------------------------------------------------- YouTube
+
+YT_FILE = os.path.expanduser("~/.cache/musicweb/youtube.json")
+YT_MAX = 50                                       # quantos vídeos ficam no histórico
+YT_FORMAT = "bestaudio[ext=m4a]/bestaudio[acodec^=mp4a]/bestaudio/best"   # m4a toca em qualquer navegador
+YT_COOKIES = os.environ.get("YT_COOKIES", "")
+YT_ID = re.compile(r"(?:[?&]v=|youtu\.be/|/shorts/|/live/|/embed/|/v/)([A-Za-z0-9_-]{11})")
+
+yt_items = {}    # id ("yt_" + id do vídeo) -> item, do mais antigo para o mais recente
+yt_urls = {}     # id -> (link direto do áudio, cabeçalhos, quando foi obtido)
+yt_locks, yt_locks_lock = {}, threading.Lock()
+try:
+    with open(YT_FILE) as fh:
+        for _y in json.load(fh):
+            yt_items[_y["id"]] = _y
+except (OSError, ValueError, KeyError, TypeError):
+    pass
+
+
+def yt_public(y):
+    return {k: y[k] for k in ("id", "vid", "title", "artist", "dur", "fmt", "q")}
+
+
+def yt_save():
+    os.makedirs(os.path.dirname(YT_FILE), exist_ok=True)
+    with lock:
+        data = list(yt_items.values())
+    with open(YT_FILE, "w") as fh:
+        json.dump(data, fh)
+
+
+def yt_vid(url):
+    url = (url or "").strip()
+    if re.fullmatch(r"[A-Za-z0-9_-]{11}", url):
+        return url
+    m = YT_ID.search(url)
+    return m.group(1) if m else None
+
+
+def ytdlp_cmd():
+    p = shutil.which("yt-dlp")
+    if p:
+        return [p]
+    if importlib.util.find_spec("yt_dlp"):
+        return [sys.executable, "-m", "yt_dlp"]
+    return None
+
+
+def yt_resolve(vid):
+    """Pergunta ao yt-dlp os dados do vídeo e o link direto do áudio."""
+    cmd = ytdlp_cmd()
+    if not cmd:
+        raise ValueError("yt-dlp não está instalado no servidor (pip install yt-dlp)")
+    try:
+        extra = ["--cookies", os.path.expanduser(YT_COOKIES)] if YT_COOKIES else []
+        r = subprocess.run(cmd + extra + ["-j", "--no-playlist", "--no-warnings", "-f", YT_FORMAT,
+                                          "https://www.youtube.com/watch?v=" + vid],
+                           capture_output=True, text=True, timeout=90)
+    except subprocess.TimeoutExpired:
+        raise ValueError("o YouTube demorou demais para responder")
+    if r.returncode != 0:
+        errs = [l for l in r.stderr.splitlines() if "ERROR" in l] or r.stderr.strip().splitlines() or ["erro desconhecido"]
+        if "confirm you" in errs[-1] and "bot" in errs[-1]:
+            raise ValueError("o YouTube pediu login para confirmar que não é um robô. Atualize o yt-dlp "
+                             "(pip install -U yt-dlp) ou use YT_COOKIES (veja o topo do server.py)")
+        if "Private video" in errs[-1] or "unavailable" in errs[-1].lower():
+            raise ValueError("este vídeo é privado ou não está disponível")
+        raise ValueError(re.sub(r"^ERROR:\s*(\[[^\]]*\]\s*)?(\S+:\s*)?", "", errs[-1]))
+    info = json.loads(r.stdout)
+    url = info.get("url") or (info.get("requested_formats") or [{}])[0].get("url")
+    if not url:
+        raise ValueError("não achei o áudio deste vídeo")
+    return info, url, info.get("http_headers") or {}
+
+
+def yt_direct(tid, force=False):
+    """Link direto do áudio; o do YouTube expira em algumas horas, então é renovado."""
+    with yt_locks_lock:
+        lk = yt_locks.setdefault(tid, threading.Lock())
+    with lk:
+        c = yt_urls.get(tid)
+        if c and not force and time.time() - c[2] < 3 * 3600:
+            return c
+        _, url, headers = yt_resolve(yt_items[tid]["vid"])
+        c = yt_urls[tid] = (url, headers, time.time())
+        return c
+
+
+# "(Official Video)", "[Clipe Oficial]", "(Lyrics)", "| Ao Vivo no ..."
+YT_JUNK = re.compile(r"\s*[(\[][^)\]]*(?:official|oficial|video|vídeo|clipe|clip|audio|áudio|lyric|letra|legendad|"
+                     r"visuali|\bhd\b|\b4k\b|\bmv\b)[^)\]]*[)\]]", re.I)
+
+
+def guess_artist_title(title, uploader):
+    t = YT_JUNK.sub("", title)
+    t = re.sub(r"\s*[|｜].*$", "", t).strip()
+    parts = re.split(r"\s+[-–—]\s+", t, maxsplit=1)
+    if len(parts) == 2 and parts[0] and parts[1]:
+        return parts[0].strip(), parts[1].strip(' "\'')
+    return uploader, t.strip(' "\'')
+
+
+def yt_add(url):
+    vid = yt_vid(url)
+    if not vid:
+        return {"ok": False, "error": "Não reconheci esse link do YouTube"}
+    tid = "yt_" + vid
+    with lock:
+        y = yt_items.get(tid)
+    if not y:
+        try:
+            info, direct, headers = yt_resolve(vid)
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+        yt_urls[tid] = (direct, headers, time.time())
+        title = info.get("title") or vid
+        uploader = re.sub(r"\s*-\s*Topic$|VEVO$", "", info.get("uploader") or info.get("channel") or "").strip()
+        if info.get("track") and info.get("artist"):          # vídeos do YouTube Music trazem artista/faixa
+            la, lt = info["artist"].split(",")[0].strip(), info["track"]
+        else:
+            la, lt = guess_artist_title(title, uploader)
+        abr = info.get("abr") or 0
+        y = {"id": tid, "vid": vid, "title": info.get("track") or title, "artist": info.get("artist") or uploader,
+             "dur": round(info.get("duration") or 0), "fmt": "YT", "q": f"{round(abr)}k" if abr else "",
+             "album": tid, "n": 0, "disc": 1, "l_artist": la, "l_title": lt}
+    with lock:
+        yt_items.pop(tid, None)
+        yt_items[tid] = y                         # vai para o fim = mais recente
+        playing = state["queue"][state["pos"]] if state["active"] and state["queue"] else None
+        for old in [k for k in yt_items if k not in (tid, playing)][:max(0, len(yt_items) - YT_MAX)]:
+            yt_items.pop(old)
+        state["lib"] += 1
+    yt_save()
+    return {"ok": True, "item": yt_public(y)}
+
+
+def yt_remove(tid):
+    with lock:
+        if yt_items.pop(tid, None) is None:
+            return {"ok": False}
+        state["lib"] += 1
+    yt_urls.pop(tid, None)
+    for p in (os.path.join(CACHE, tid + ".img"), os.path.join(LYR_CACHE, tid + ".json")):
+        try:
+            os.remove(p)
+        except OSError:
+            pass
+    yt_save()
+    return {"ok": True}
+
+
+def yt_thumb(tid):
+    p = os.path.join(CACHE, tid + ".img")
+    if os.path.exists(p):
+        with open(p, "rb") as fh:
+            return fh.read()
+    try:
+        data = http_get(f"https://i.ytimg.com/vi/{yt_items[tid]['vid']}/mqdefault.jpg")
+    except Exception:
+        return None
+    os.makedirs(CACHE, exist_ok=True)
+    with open(p, "wb") as fh:
+        fh.write(data)
+    return data
+
+
+# ---------------------------------------------------------------- letras
+
+LYR_CACHE = os.path.expanduser("~/.cache/musicweb/lyrics")
+LRC_LINE = re.compile(r"^\s*\[\d+:\d+(?:[.:]\d+)?\]", re.M)
+TITLE_JUNK = re.compile(r"\s*(?:[(\[][^)\]]*(?:remaster|bonus|mono|stereo|version|versão|edit\b|feat\.|ft\.)[^)\]]*[)\]]"
+                        r"|\s[-–]\s[^-–]*(?:remaster|version|versão|mono|stereo|edit\b)[^-–]*)$", re.I)
+
+
+def clean_title(s):
+    prev = None
+    while prev != s:
+        prev, s = s, TITLE_JUNK.sub("", s)
+    return s.strip() or prev
+
+
+def lyr_pack(text, src):
+    text = text.replace("\r\n", "\n").strip()
+    synced = text if LRC_LINE.search(text) else ""
+    return {"ok": True, "synced": synced, "plain": "" if synced else text, "src": src}
+
+
+def lyrics_local(t):
+    """Arquivo .lrc/.txt com o mesmo nome da música, ou letra gravada nas tags."""
+    stem = os.path.splitext(t["path"])[0]
+    for ext in (".lrc", ".LRC", ".txt"):
+        if os.path.isfile(stem + ext):
+            with open(stem + ext, encoding="utf-8-sig", errors="replace") as fh:
+                text = fh.read()
+            if text.strip():
+                return lyr_pack(text, "arquivo " + ext.lower())
+    if not mutagen:
+        return None
+    try:
+        tags = mutagen.File(t["path"]).tags
+    except Exception:
+        return None
+    if tags is None:
+        return None
+    if hasattr(tags, "getall"):                                    # MP3 (ID3)
+        for fr in tags.getall("USLT"):
+            if str(fr.text).strip():
+                return lyr_pack(str(fr.text), "tags")
+        return None
+    for k in ("LYRICS", "UNSYNCEDLYRICS", "\xa9lyr"):              # FLAC/OGG, M4A
+        try:
+            v = tags.get(k) or tags.get(k.lower())
+        except Exception:
+            v = None
+        if v and str(v[0]).strip():
+            return lyr_pack(str(v[0]), "tags")
+    return None
+
+
+def lrclib_get(url):
+    """GET no LRCLIB; se ele pedir para esperar (429), espera e tenta mais uma vez."""
+    try:
+        return http_get(url, True)
+    except urllib.error.HTTPError as e:
+        if e.code != 429:
+            raise
+        time.sleep(min(3.0, float(e.headers.get("Retry-After") or 1)))
+        return http_get(url, True)
+
+
+def lrclib(artist, title, album="", dur=0):
+    base = "https://lrclib.net/api/"
+    has = lambda r: r.get("syncedLyrics") or r.get("plainLyrics") or r.get("instrumental")
+
+    def pack(r):
+        synced = r.get("syncedLyrics") or ""
+        return {"ok": True, "synced": synced, "plain": "" if synced else (r.get("plainLyrics") or ""),
+                "instrumental": bool(r.get("instrumental")) and not synced and not r.get("plainLyrics"), "src": "LRCLIB"}
+
+    if artist and dur:                                             # busca exata (artista + faixa + duração)
+        p = {"artist_name": artist, "track_name": title, "duration": dur}
+        if album:
+            p["album_name"] = album
+        try:
+            r = lrclib_get(base + "get?" + urllib.parse.urlencode(p))
+            if has(r):
+                return pack(r)
+        except urllib.error.HTTPError as e:
+            if e.code not in (400, 404, 429):       # sem resultado exato: tenta a busca
+                raise
+    searches = ([{"track_name": title, "artist_name": artist}] if artist else []) + [{"q": f"{artist} {title}".strip()}]
+    for p in searches:
+        cands = [r for r in lrclib_get(base + "search?" + urllib.parse.urlencode(p)) if has(r)]
+        # prefere duração parecida (mesma versão) e letra sincronizada
+        cands.sort(key=lambda r: (bool(dur) and abs((r.get("duration") or 0) - dur) > 3, not r.get("syncedLyrics")))
+        if cands:
+            return pack(cands[0])
+    return None
+
+
+def get_lyrics(tid, artist="", title=""):
+    t = item(tid)
+    if not t:
+        return {"ok": False, "error": "Faixa não encontrada"}
+    yt, manual = tid in yt_items, bool(artist or title)
+    cache = os.path.join(LYR_CACHE, tid + ".json")
+    if not manual:
+        if not yt:
+            res = lyrics_local(t)
+            if res:
+                return res
+        try:
+            with open(cache) as fh:
+                return json.load(fh)
+        except (OSError, ValueError):
+            pass
+    alb = albums.get(t["album"])
+    if yt:
+        da, dt, album = t.get("l_artist", t["artist"]), t.get("l_title", t["title"]), ""
+    else:
+        da = t["artist"] or (alb["artist"] if alb and alb["artist"] not in ("Vários artistas", "Desconhecido") else "")
+        dt, album = t["title"], clean_album(alb["full"]) if alb else ""
+    artist, title = (artist or da).strip(), clean_title((title or dt).strip())
+    try:
+        res = lrclib(artist, title, album, t["dur"])
+    except Exception as e:
+        print("[letra] lrclib:", e, flush=True)
+        busy = isinstance(e, urllib.error.HTTPError) and e.code == 429
+        return {"ok": False, "artist": artist, "title": title,
+                "error": "O LRCLIB pediu para esperar um pouco. Tente de novo daqui a alguns segundos."
+                if busy else "Não consegui falar com o LRCLIB"}
+    if not res:
+        return {"ok": False, "artist": artist, "title": title}
+    os.makedirs(LYR_CACHE, exist_ok=True)
+    with open(cache, "w") as fh:
+        json.dump(res, fh)
+    return res
+
+
 # ---------------------------------------------------------------- streaming e download
 
 def zip_name(s):
@@ -793,6 +1117,10 @@ class H(BaseHTTPRequestHandler):
             self.send(json.dumps(status()))
         elif p == "/api/cover_search":
             self.send(json.dumps(cover_candidates(q.get("q", [""])[0])))
+        elif p == "/api/lyrics":
+            self.send(json.dumps(get_lyrics(q.get("id", [""])[0], q.get("artist", [""])[0], q.get("title", [""])[0])))
+        elif p.startswith("/api/stream/yt_"):
+            self.yt_stream(p.rsplit("/", 1)[1], "dl" in q)
         elif p.startswith("/api/stream/"):
             self.stream(p.rsplit("/", 1)[1], "dl" in q)
         elif p.startswith("/api/download/"):
@@ -849,6 +1177,55 @@ class H(BaseHTTPRequestHandler):
         except (BrokenPipeError, ConnectionResetError):
             pass                                    # o navegador cancelou (normal ao pular trechos)
 
+    def yt_stream(self, tid, attachment=False):
+        """Repassa o áudio do YouTube (com Range, para poder pular trechos)."""
+        if tid not in yt_items:
+            return self.send("{}", code=404)
+        r = None
+        for attempt in range(2):                     # na 2ª tentativa pede um link novo (o antigo expirou)
+            try:
+                url, headers, _ = yt_direct(tid, force=attempt > 0)
+            except Exception as e:
+                return self.send(json.dumps({"error": str(e)}), code=502)
+            h = dict(headers)
+            if self.headers.get("Range"):
+                h["Range"] = self.headers["Range"]
+            try:
+                r = urllib.request.urlopen(urllib.request.Request(url, headers=h), timeout=20)
+                break
+            except urllib.error.HTTPError as e:
+                if e.code == 416:
+                    self.send_response(416)
+                    if e.headers.get("Content-Range"):
+                        self.send_header("Content-Range", e.headers["Content-Range"])
+                    self.end_headers()
+                    return
+                if attempt == 1:
+                    return self.send("{}", code=502)
+            except Exception:
+                if attempt == 1:
+                    return self.send("{}", code=502)
+        with r:
+            ctype = r.headers.get("Content-Type", "audio/mp4")
+            self.send_response(r.status)
+            self.send_header("Content-Type", ctype)
+            for k in ("Content-Length", "Content-Range"):
+                if r.headers.get(k):
+                    self.send_header(k, r.headers[k])
+            self.send_header("Accept-Ranges", "bytes")
+            if attachment:
+                fname = safe_name(yt_items[tid]["title"]) + (".webm" if "webm" in ctype else ".m4a")
+                self.send_header("Content-Disposition", "attachment; filename*=UTF-8''" + urllib.parse.quote(fname))
+            self.end_headers()
+            try:
+                while True:
+                    chunk = r.read(65536)
+                    if not chunk:
+                        break
+                    self.wfile.write(chunk)
+            except OSError:
+                pass                                 # o navegador/mpv cancelou (normal ao pular trechos)
+
     def download(self, aid):
         with lock:
             a = albums.get(aid)
@@ -899,6 +1276,8 @@ class H(BaseHTTPRequestHandler):
                 elif body.get("id") in tracks:
                     queue = albums[tracks[body["id"]]["album"]]["tracks"]
                     pos = queue.index(body["id"])
+                elif body.get("id") in yt_items:
+                    queue, pos = [body["id"]], 0
                 else:
                     return self.send('{"error":"não encontrado"}', code=404)
                 state["queue"] = list(queue)
@@ -938,6 +1317,10 @@ class H(BaseHTTPRequestHandler):
                 return self.send(json.dumps({"ok": False, "error": str(e)}))
         elif p == "/api/delete":
             return self.send(json.dumps(remove_album(body.get("album", ""), bool(body.get("permanent")))))
+        elif p == "/api/yt":
+            return self.send(json.dumps(yt_add(body.get("url", ""))))
+        elif p == "/api/yt_remove":
+            return self.send(json.dumps(yt_remove(body.get("id", ""))))
         else:
             return self.send("{}", code=404)
         self.send(json.dumps(status()))
@@ -950,8 +1333,11 @@ if __name__ == "__main__":
     ap.add_argument("--host", default="0.0.0.0")
     a = ap.parse_args()
     ROOT = os.path.abspath(a.root)
+    PORT = a.port
+    LOCAL_HOST = a.host if a.host not in ("", "0.0.0.0", "::") else "127.0.0.1"   # o mpv busca o YouTube por aqui
     scan(ROOT)
-    print(f"{len(tracks)} faixas em {len(albums)} álbuns ({ROOT}); mutagen={'sim' if mutagen else 'não'}")
+    print(f"{len(tracks)} faixas em {len(albums)} álbuns ({ROOT}); mutagen={'sim' if mutagen else 'não'}; "
+          f"yt-dlp={'sim' if ytdlp_cmd() else 'não'}")
     mpv_start()
     threading.Thread(target=mpv_events, daemon=True).start()
     if RESCAN_EVERY > 0:
