@@ -149,7 +149,7 @@ If the lyrics are wrong (or missing), use **"Buscar outra"** (search again) to f
 
 Requires `yt-dlp`. The audio goes through the server itself (`/api/stream/yt_<id>`), which renews the YouTube link when it expires — so it works both in mpv and in the browser.
 
-**Playlists**: a link with `list=` (a playlist, an album on YouTube Music or a mix) is read in one go with `yt-dlp --flat-playlist`, without downloading anything; each video is only resolved when its turn comes. Private or deleted videos are skipped. The playlist shows up as a single entry in "recently played".
+**Playlists**: a link with `list=` (a playlist or an album on YouTube Music) is read in one go with `yt-dlp --flat-playlist`, without downloading anything; each video is only resolved when its turn comes. Private or deleted videos are skipped. The playlist shows up as a single entry in "recently played". A video link that carries YouTube's automatic mix (`list=RD…`, "Mix - …") plays only that video.
 
 If you see *"o YouTube pediu login para confirmar que não é um robô"* (YouTube asked to sign in to confirm you're not a bot):
 
@@ -391,7 +391,7 @@ Se vier a letra errada (ou nenhuma), use **"Buscar outra"** para corrigir artist
 
 Precisa do `yt-dlp`. O áudio passa pelo próprio servidor (`/api/stream/yt_<id>`), que renova o link do YouTube quando ele expira — assim funciona tanto no mpv quanto no navegador.
 
-**Playlists**: um link com `list=` (playlist, álbum do YouTube Music ou mix) é lido de uma vez com `yt-dlp --flat-playlist`, sem baixar nada; cada vídeo só é resolvido quando chega a vez dele. Vídeos privados ou apagados são pulados. A playlist aparece como um item só em "Tocados recentemente".
+**Playlists**: um link com `list=` (playlist ou álbum do YouTube Music) é lido de uma vez com `yt-dlp --flat-playlist`, sem baixar nada; cada vídeo só é resolvido quando chega a vez dele. Vídeos privados ou apagados são pulados. A playlist aparece como um item só em "Tocados recentemente". Um link de vídeo que traz o mix automático do YouTube (`list=RD…`, "Mix - …") toca só aquele vídeo.
 
 Se aparecer *"o YouTube pediu login para confirmar que não é um robô"*:
 

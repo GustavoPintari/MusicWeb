@@ -119,6 +119,17 @@ def yt_resolve(vid):
     return info, url, info.get("http_headers") or {}
 
 
+def yt_check(tid):
+    """Why a video can't be played (the browser only sees that the audio failed to load)."""
+    if tid not in yt_items:
+        return {"ok": False, "error": _("Não consegui abrir esse vídeo")}
+    try:
+        yt_direct(tid)
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+    return {"ok": True}
+
+
 def yt_direct(tid, force=False):
     """Direct audio link; YouTube's expires after a few hours, so it is renewed."""
     with yt_locks_lock:
@@ -151,9 +162,10 @@ def clean_uploader(s):
 
 
 def yt_add(url):
-    if YT_LIST.search(url or ""):
+    m, vid = YT_LIST.search(url or ""), yt_vid(url)
+    # a video opened from YouTube's automatic mix ("RD...", "Mix - ...") brings it in the link: play just the video
+    if m and not (vid and m.group(1).startswith("RD")):
         return yt_add_playlist(url)
-    vid = yt_vid(url)
     if not vid:
         return {"ok": False, "error": _("Não reconheci esse link do YouTube")}
     tid = "yt_" + vid

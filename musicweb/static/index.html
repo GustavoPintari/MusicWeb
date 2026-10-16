@@ -428,24 +428,21 @@ function paint(el,c,pre){                   // c.ac is empty for gray covers: ke
   el.style.setProperty(`--${pre}`,c.bg);el.style.setProperty(`--${pre}2`,c.bg2);
   if(c.ac)el.style.setProperty("--ac",c.ac);else el.style.removeProperty("--ac");
 }
-function setTint(key,a){                    // key: which sheet asked, so a late answer can't tint another one
-  const sh=$("#sheet"),meta=document.querySelector('meta[name="theme-color"]');
-  if(!a){sh.classList.remove("tinted");sh.style.removeProperty("--ac");meta.content="#121212";return}
-  albumTint(a).then(c=>{if(openAlbum!==key)return;paint(sh,c,"tint");sh.classList.add("tinted");meta.content=c.bg});
+// key: which sheet asked, so a late answer can't tint another one. The player bar takes the same colors,
+// so the album page looks like one piece; everywhere else both stay neutral.
+function setTint(key,a){
+  const sh=$("#sheet"),bar=$("#bar"),meta=document.querySelector('meta[name="theme-color"]');
+  if(!a){for(const el of [sh,bar]){el.classList.remove("tinted");el.style.removeProperty("--ac")}meta.content="#121212";return}
+  albumTint(a).then(c=>{if(openAlbum!==key)return;paint(sh,c,"tint");paint(bar,c,"btint");sh.classList.add("tinted");bar.classList.add("tinted");meta.content=c.bg});
 }
 
-function setBarTint(tr){                   // player bar takes the color of the album that is playing
-  const bar=$("#bar"),a=tr&&!tr.radio&&(byId[tr.album]||trackById[tr.id]?.a||{id:tr.album,name:tr.album_name,artist:""});
-  if(!a){bar.classList.remove("tinted");bar.style.removeProperty("--ac");return}
-  albumTint(a).then(c=>{if(S.track?.id!==tr.id)return;paint(bar,c,"btint");bar.classList.add("tinted")});
-}
 
 let editing=false;
 function renderSheet(){
   if(openAlbum==="@yt"){setTint();return renderYT()}
   if(openAlbum==="@radio"){setTint();return renderRadio()}
   if(openAlbum==="@retro"){setTint();return renderRetro()}
-  if(openAlbum==="@ly")return renderLyrics();
+  if(openAlbum==="@ly"){setTint();return renderLyrics()}
   const a=byId[openAlbum];if(!a)return;
   setTint(openAlbum,a);
   if(editing)return renderEdit(a);
@@ -910,7 +907,6 @@ function show(s){
     const a=s.track&&(byId[s.track.album]||trackById[s.track.id]?.a);
     $("#now").innerHTML=s.track?`${cover(a||{id:s.track.album,name:s.track.album_name,artist:""},"",true)}<div class="tx"><b>${esc(s.track.title)}</b><small>${nowSub(s.track)}</small></div>`:`<div class="tx"><small>${T("Nada tocando")}</small></div>`;
     document.title=s.track?`${s.track.title} - MusicWeb`:"MusicWeb";
-    setBarTint(s.track);
     $("#nowfmt").innerHTML=s.track?fmtBadge(s.track.fmt,s.track.q):"";
     if(mode==="local")mediaMeta();
     if(openAlbum==="@ly")renderLyrics();
@@ -969,10 +965,14 @@ function hlsStop(){if(hlsPlayer){hlsPlayer.destroy();hlsPlayer=null}}
 let LC={tid:null};                          // listening counter for the current local track
 function localPlay(queue,pos,t=0,autoplay=true){
   if(pos<0||pos>=queue.length){localStop();return}
+  if(L.queue!==queue)L.fails=0;
   L.queue=queue;L.pos=pos;L.err="";LC={tid:queue[pos],heard:0,last:null,counted:false};
   hlsStop();
   const tr=trackById[queue[pos]]?.t,url=tr?.url||"/api/stream/"+queue[pos];       // radio: the stream itself
-  const fail=e=>{L.err=e.name==="NotAllowedError"?T("Toque em ▶ para começar a tocar aqui"):T("Não consegui tocar: ")+e.message;lshow()};
+  const fail=e=>{
+    if(e.name==="AbortError")return;         // another track was loaded meanwhile: not an error
+    if(e.name!=="NotAllowedError"&&au.error)return;   // load failed: the "error" handler explains it
+    L.err=e.name==="NotAllowedError"?T("Toque em ▶ para começar a tocar aqui"):T("Não consegui tocar: ")+e.message;lshow()};
   if(isHls(tr)&&!au.canPlayType("application/vnd.apple.mpegurl")){
     au.removeAttribute("src");
     loadHls().then(Hls=>{
@@ -991,12 +991,20 @@ function localPlay(queue,pos,t=0,autoplay=true){
 }
 function localStop(){hlsStop();au.pause();au.removeAttribute("src");au.load();L.pos=-1;lshow()}
 au.addEventListener("ended",()=>localPlay(L.queue,L.pos+1));
-au.addEventListener("error",()=>{
-  if(!au.getAttribute("src"))return;
-  const ti=trackById[L.queue[L.pos]];
-  L.err=T("Este navegador não conseguiu tocar {what}",{what:(ti?.t.fmt||T("o arquivo"))+(ti?` (${ti.t.title})`:"")});lshow();
-  setTimeout(()=>{if(L.err)localPlay(L.queue,L.pos+1)},2500);
+au.addEventListener("error",async()=>{
+  if(!au.getAttribute("src")||hlsPlayer)return;
+  const q=L.queue,p=L.pos,tid=q[p],ti=trackById[tid];
+  L.err=T("Este navegador não conseguiu tocar {what}",{what:(ti?.t.fmt||T("o arquivo"))+(ti?` (${ti.t.title})`:"")});
+  if(tid?.startsWith("yt_")){                // YouTube: the server knows why (yt-dlp error, "not a bot"...)
+    try{const r=await (await fetch("/api/yt_check?id="+encodeURIComponent(tid))).json();if(!r.ok&&r.error)L.err="YouTube: "+r.error}catch(e){}
+    if(L.queue!==q||L.pos!==p)return;
+  }
+  lshow();
+  L.fails=(L.fails||0)+1;
+  if(L.fails>=3)return;                      // don't run through a whole playlist when every track fails
+  setTimeout(()=>{if(L.err&&L.queue===q&&L.pos===p)localPlay(q,p+1)},2500);
 });
+au.addEventListener("playing",()=>{L.fails=0});
 ["play","pause","loadedmetadata"].forEach(ev=>au.addEventListener(ev,lshow));
 au.addEventListener("timeupdate",()=>{
   if(mode!=="local"||!historyOn||!LC.tid||LC.counted||trackById[LC.tid]?.t.radio)return;   // radio is not counted
