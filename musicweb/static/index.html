@@ -62,7 +62,9 @@ header{position:sticky;top:0;z-index:5;background:var(--bg);padding:12px 0 10px;
 #sheet.scrolled .top{background:var(--bg);box-shadow:0 4px 14px #0006}
 /* album color: a gradient from the cover's dominant color behind the top of the sheet */
 #sheet::before{content:"";position:absolute;left:0;right:0;top:0;height:560px;pointer-events:none;z-index:0;opacity:0;
-  background:linear-gradient(180deg,transparent 30%,var(--bg) 100%),linear-gradient(105deg,var(--tint,transparent) 25%,var(--tint2,var(--tint,transparent)));transition:opacity .45s}
+  background:linear-gradient(180deg,transparent 25%,var(--bg) 90%),
+    radial-gradient(circle at 0% 0%,var(--tint) 0,transparent 65%),radial-gradient(circle at 100% 0%,var(--tint2) 0,transparent 60%),
+    radial-gradient(circle at 50% 55%,var(--tint3) 0,transparent 55%),var(--tint,transparent);transition:opacity .45s}
 #sheet.tinted::before{opacity:1}
 #sheet.tinted.scrolled .top{background:linear-gradient(105deg,var(--tint) 25%,var(--tint2))}
 #sheet>*{position:relative;z-index:1}#sheet>.top{z-index:2}
@@ -147,7 +149,7 @@ a.btn2:active{transform:scale(.92);filter:brightness(1.35)}
 .ctl button{width:42px;height:42px;padding:0;display:grid;place-items:center;border-radius:50%}
 #pp{background:var(--fg);color:#000;width:48px;height:48px}
 #err{color:var(--err);font-size:12px;margin-top:4px}
-#bar.tinted{background:linear-gradient(105deg,color-mix(in srgb,var(--btint) 75%,#000c) 30%,color-mix(in srgb,var(--btint2) 75%,#000c));border-top-color:#fff1}
+#bar.tinted{background:linear-gradient(105deg,color-mix(in srgb,var(--btint) 75%,#000c) 15%,color-mix(in srgb,var(--btint3) 75%,#000c) 55%,color-mix(in srgb,var(--btint2) 75%,#000c));border-top-color:#fff1}
 #bar.tinted #prog .tr{background:#fff3}
 #volpop{display:none;align-items:center;gap:10px;padding:8px 0 4px}
 #volpop.open{display:flex}
@@ -386,7 +388,7 @@ function render(){
   }
 }
 
-// ---------- album colors from the cover: the strongest hue (and a second one, for a two-color gradient),
+// ---------- album colors from the cover: up to three strong hues (for a gradient of color "patches"),
 // darkened to sit behind white text, plus a light accent of the same hue for the buttons.
 // Hues are grouped in 24 bins weighted by saturation, so a few vivid colors win over a large white or gray area,
 // and the colors aren't averaged together (averaging many hues is what made "muddy brown").
@@ -409,17 +411,22 @@ function coverColors(d){                    // d: RGBA pixels of the cover, scal
   if(!n||cn<n*.03)return null;              // black and white cover
   const at=i=>bins[(i+24)%24],score=i=>at(i-1).w*.5+at(i).w+at(i+1).w*.5;
   const hueOf=k=>{let w=0,r=0,g=0,b=0;for(const bn of [at(k-1),at(k),at(k+1)]){w+=bn.w;r+=bn.r;g+=bn.g;b+=bn.b}return toHsl(r/w,g/w,b/w)};
-  let best=0;for(let i=1;i<24;i++)if(score(i)>score(best))best=i;
-  let sec=-1;for(let i=0;i<24;i++){const dd=Math.min(Math.abs(i-best),24-Math.abs(i-best));if(dd>=4&&(sec<0||score(i)>score(sec)))sec=i}
+  // strongest hue first; each next one at least 45° from the others and with 8% of the first one's weight
+  const far=(i,ks)=>ks.every(k=>Math.min(Math.abs(i-k),24-Math.abs(i-k))>=3),ks=[];
+  while(ks.length<3){
+    let b=-1;for(let i=0;i<24;i++)if(far(i,ks)&&(b<0||score(i)>score(b)))b=i;
+    if(b<0||score(b)<=0||(ks.length&&score(b)<score(ks[0])*.08))break;
+    ks.push(b);
+  }
   const cl=(v,a,z)=>Math.min(z,Math.max(a,v));
   const dark=([h,s])=>`hsl(${Math.round(h)} ${Math.round(cl(s*1.1,.45,.8)*100)}% ${h>=40&&h<=75?24:28}%)`;   // yellows look brighter
-  const [h,s]=hueOf(best),bg=dark([h,s]);
-  return {bg,bg2:sec>=0&&score(sec)>=score(best)*.18?dark(hueOf(sec)):bg,
+  const cs=ks.map(k=>dark(hueOf(k))),[h,s]=hueOf(ks[0]);
+  return {bg:cs[0],bg2:cs[1]||cs[0],bg3:cs[2]||cs[1]||cs[0],
     ac:`hsl(${Math.round(h)} ${Math.round(cl(s,.6,.9)*100)}% ${h>=200&&h<=280?72:64}%)`};
 }
 function albumTint(a){
   if(tintCache[a.id])return Promise.resolve(tintCache[a.id]);
-  const ph=`hsl(${hue((a.name||"")+(a.artist||""))} 35% 26%)`,gray={bg:"hsl(0 0% 17%)",bg2:"hsl(0 0% 17%)",ac:""};
+  const ph=`hsl(${hue((a.name||"")+(a.artist||""))} 35% 26%)`,gray={bg:"hsl(0 0% 17%)",bg2:"hsl(0 0% 17%)",bg3:"hsl(0 0% 17%)",ac:""};
   return new Promise(res=>{
     const img=new Image();
     img.onload=()=>{
@@ -427,14 +434,14 @@ function albumTint(a){
         const c=document.createElement("canvas");c.width=c.height=48;
         const x=c.getContext("2d");x.drawImage(img,0,0,48,48);
         res(tintCache[a.id]=coverColors(x.getImageData(0,0,48,48).data)||gray);
-      }catch(e){res(tintCache[a.id]={bg:ph,bg2:ph,ac:""})}
+      }catch(e){res(tintCache[a.id]={bg:ph,bg2:ph,bg3:ph,ac:""})}
     };
-    img.onerror=()=>res(tintCache[a.id]={bg:ph,bg2:ph,ac:""});   // same hue as the placeholder cover
+    img.onerror=()=>res(tintCache[a.id]={bg:ph,bg2:ph,bg3:ph,ac:""});   // same hue as the placeholder cover
     img.src=`/api/cover/${a.id}?v=${a.cv||0}`;
   });
 }
 function paint(el,c,pre){                   // c.ac is empty for gray covers: keep the default accent
-  el.style.setProperty(`--${pre}`,c.bg);el.style.setProperty(`--${pre}2`,c.bg2);
+  el.style.setProperty(`--${pre}`,c.bg);el.style.setProperty(`--${pre}2`,c.bg2);el.style.setProperty(`--${pre}3`,c.bg3);
   if(c.ac)el.style.setProperty("--ac",c.ac);else el.style.removeProperty("--ac");
 }
 // key: which sheet asked, so a late answer can't tint another one. The player bar takes the same colors,
