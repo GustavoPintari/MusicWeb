@@ -19,11 +19,14 @@ FILE_KEYS = {
     ("library", "rescan_every"): ("rescan_every", int),
     ("library", "trash_dir"): ("trash_dir", str),
     ("mpv", "audio_output"): ("mpv_ao", str),
+    ("mpv", "gapless"): ("mpv_gapless", bool),
+    ("mpv", "replaygain"): ("mpv_replaygain", str),
     ("covers", "online"): ("covers_online", bool),
     ("lyrics", "online"): ("lyrics_online", bool),
     ("youtube", "cookies"): ("yt_cookies", str),
     ("youtube", "max_history"): ("yt_max_history", int),
     ("youtube", "format"): ("yt_format", str),
+    ("youtube", "playlist_max"): ("yt_playlist_max", int),
     ("cache", "dir"): ("cache_dir", str),
     ("data", "dir"): ("data_dir", str),
     ("history", "enabled"): ("history_enabled", bool),
@@ -65,10 +68,13 @@ class Config:
     rescan_every: int = 60                   # seconds between checks for new music; 0 disables
     trash_dir: str = ""                      # empty = .musicweb-lixeira folder next to the library
     mpv_ao: str = "opensles"                 # mpv audio output
+    mpv_gapless: bool = True                 # no pause between tracks (mpv output only)
+    mpv_replaygain: str = "album"            # volume leveling from ReplayGain tags: "album", "track" or "no"
     covers_online: bool = True               # look up covers on iTunes / MusicBrainz
     lyrics_online: bool = True               # look up lyrics on LRCLIB
     yt_cookies: str = ""                     # cookies.txt, if YouTube asks to sign in
     yt_max_history: int = 50
+    yt_playlist_max: int = 200               # videos read from a playlist link
     yt_format: str = "bestaudio[ext=m4a]/bestaudio[acodec^=mp4a]/bestaudio/best"   # m4a plays in every browser
     cache_dir: str = "~/.cache/musicweb"     # disposable: covers, lyrics, YouTube history
     data_dir: str = "~/.local/share/musicweb"   # kept: SQLite database (scan cache, play history, queue)
@@ -126,6 +132,9 @@ class Config:
         for env, (attr, kind) in ENV_KEYS.items():
             if os.environ.get(env) is not None:
                 setattr(self, attr, _conv(kind, os.environ[env]))
+        if self.mpv_replaygain not in ("album", "track", "no"):
+            print(f"[config] valor inválido em [mpv] replaygain: {self.mpv_replaygain!r} (use album, track ou no); usando album")
+            self.mpv_replaygain = "album"
         if self.language.strip().lower() not in LANGUAGES:
             print(f"[config] idioma desconhecido em [interface] language: {self.language!r} (use \"pt-BR\" ou \"en\"); usando pt-BR")
             self.language = "pt-BR"

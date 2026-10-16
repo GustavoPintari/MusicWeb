@@ -142,6 +142,8 @@ def find_lyrics(tid, artist="", title=""):
                 if busy else _("Não consegui falar com o LRCLIB")}
     if not res:
         return {"ok": False, "artist": artist, "title": title}
+    if t.get("radio"):                            # a station plays a different song every few minutes: don't cache
+        return res
     os.makedirs(cfg.lyrics_dir, exist_ok=True)
     with open(cache, "w") as fh:
         json.dump(res, fh)

@@ -6,7 +6,7 @@
 <style>
 :root{--bg:#121212;--card:#1c1c1c;--card2:#262626;--fg:#f2f2f2;--mut:#9a9a9a;--ac:#5aa9e6;--err:#ff6b6b}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.35 system-ui,-apple-system,sans-serif;padding:0 16px 150px}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.35 system-ui,-apple-system,sans-serif;padding:0 16px calc(var(--barh,150px) + 24px)}
 button{font:inherit;color:inherit;background:var(--card2);border:0;border-radius:10px;padding:9px 12px;cursor:pointer;
   transition:transform .08s ease,background .15s ease,filter .15s ease;user-select:none}
 button:active,.press:active{transform:scale(.92);filter:brightness(1.35)}
@@ -45,10 +45,16 @@ header{position:sticky;top:0;z-index:5;background:var(--bg);padding:12px 0 10px;
 .ar.open .row{display:flex}.ar .row .al{flex:0 0 120px;scroll-snap-align:start}
 
 /* open album */
-#sheet{position:fixed;inset:0;z-index:10;background:var(--bg);overflow-y:auto;padding:0 16px 150px;
+#sheet{position:fixed;inset:0;z-index:10;background:var(--bg);overflow-y:auto;padding:0 16px calc(var(--barh,150px) + 24px);
   transform:translateY(100%);transition:transform .25s ease;visibility:hidden}
 #sheet.open{transform:none;visibility:visible}
-#sheet .top{position:sticky;top:0;background:var(--bg);padding:12px 0;z-index:1}
+#sheet .top{position:sticky;top:0;background:var(--bg);padding:12px 0;z-index:2;transition:background .45s}
+/* album color: a gradient from the cover's dominant color behind the top of the sheet */
+#sheet::before{content:"";position:absolute;left:0;right:0;top:0;height:560px;pointer-events:none;z-index:0;opacity:0;
+  background:linear-gradient(180deg,var(--tint,transparent) 0,var(--tint,transparent) 14%,transparent 100%);transition:opacity .45s}
+#sheet.tinted::before{opacity:1}
+#sheet.tinted .top{background:var(--tint)}
+#sheet>*{position:relative;z-index:1}#sheet>.top{z-index:2}
 .hero{display:flex;gap:16px;align-items:flex-end;flex-wrap:wrap;margin-bottom:14px}
 .hero .cv{width:min(220px,100%);font-size:56px;box-shadow:0 8px 30px #0008}
 .hero .inf{flex:1 1 200px;min-width:0}
@@ -85,7 +91,7 @@ label.btn:active{transform:scale(.92);filter:brightness(1.35)}
 #delbox label{display:flex;gap:8px;align-items:center;color:var(--fg);font-size:14px;margin:0 0 12px}
 #delbox input{width:auto}
 .redbtn{background:var(--err);color:#200;font-weight:700}
-#toast{position:fixed;left:50%;bottom:170px;transform:translate(-50%,20px);opacity:0;background:#333;color:var(--fg);
+#toast{position:fixed;left:50%;bottom:calc(var(--barh,150px) + 20px);transform:translate(-50%,20px);opacity:0;background:#333;color:var(--fg);
   padding:10px 16px;border-radius:10px;z-index:30;transition:.25s;pointer-events:none;max-width:90vw;font-size:14px}
 #toast.show{opacity:1;transform:translate(-50%,0)}
 #outrow{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:2px}
@@ -179,6 +185,38 @@ a.btn2:active{transform:scale(.92);filter:brightness(1.35)}
 .hr.gone{opacity:.45}.hr.on .ti b{color:var(--ac)}
 .pas{display:flex;flex-wrap:wrap;gap:8px;padding:0 4px}
 .pa{padding:7px 12px;border-radius:16px;background:var(--card);font-size:14px}.pa small{color:var(--mut);margin-left:6px}
+
+/* radio */
+#rdsh h1,#rtsh h1{font-size:22px;margin:4px 0 12px}
+#rdf{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+#rdf input,#rdf select,#rtsel{flex:1 1 160px;min-width:0;padding:10px 12px;border-radius:10px;border:1px solid #333;background:var(--card);color:var(--fg);font:inherit}
+#rdtags{margin-bottom:6px;flex-wrap:nowrap;overflow-x:auto;padding-bottom:6px;scrollbar-width:none}
+#rdtags .pa{flex:none}.pa.on{background:var(--ac);color:#0b1620}
+.rr .cv{border-radius:8px;background:var(--card2)}.rr .cv img{object-fit:contain;background:#fff1}
+.star{background:none;color:var(--mut);font-size:20px;padding:4px 8px;flex:none}.star.on{color:#f5c518}
+#rderr{color:var(--err);font-size:13px;margin:6px 0}
+.live{font-size:10px;font-weight:700;letter-spacing:.06em;color:#ff6b6b}
+
+/* retrospective */
+.rt-hero{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin:14px 0}
+.tile{background:var(--card);border-radius:12px;padding:12px 14px}
+.tile b{display:block;font-size:26px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.15}
+.tile small{color:var(--mut);font-size:12px}
+.rt-cmp{color:var(--mut);font-size:13px;margin:-4px 0 6px}
+.rt-top{display:flex;gap:16px;align-items:center;background:var(--card);border-radius:14px;padding:14px;margin:8px 0}
+.rt-top .cv{width:96px;flex:none;font-size:34px}.rt-top small{color:var(--mut);display:block}.rt-top b{font-size:19px;display:block;margin:2px 0}
+.rt-albums{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:12px}
+.rt-albums small{display:block;color:var(--mut);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rt-albums b{display:block;font-size:13px;margin-top:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chart{background:var(--card);border-radius:12px;padding:12px 12px 8px;margin:8px 0}
+.chart p{margin:0 0 10px;font-size:14px}.chart p small{color:var(--mut)}
+.bars{display:flex;align-items:flex-end;gap:2px;height:110px;border-bottom:1px solid #3a3a3a;position:relative}
+.bars .b{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:100%;min-width:0;cursor:default}
+.bars .b i{display:block;width:100%;max-width:22px;background:var(--ac);border-radius:4px 4px 0 0;min-height:0;opacity:.85}
+.bars .b:hover i,.bars .b.pk i{opacity:1}
+.bars .b span{font-size:11px;color:var(--fg);margin-bottom:3px;font-variant-numeric:tabular-nums}
+.axis{display:flex;gap:2px;margin-top:4px}.axis span{flex:1;text-align:center;font-size:10px;color:var(--mut);min-width:0}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
 @media (max-width:520px){#st{display:none}}
 </style></head><body>
 
@@ -186,6 +224,7 @@ a.btn2:active{transform:scale(.92);filter:brightness(1.35)}
   <input id="q" placeholder="Buscar álbum, artista ou faixa…" autocomplete="off">
   <div class="seg"><button data-v="albums" data-t>Álbuns</button><button data-v="artists" data-t>Artistas</button><button data-v="plays" data-t>Tocadas</button></div>
   <button id="ytb" title="Tocar do YouTube"><svg viewBox="0 0 24 24"><path d="M21.6 7.2a2.5 2.5 0 0 0-1.8-1.8C18.2 5 12 5 12 5s-6.2 0-7.8.4a2.5 2.5 0 0 0-1.8 1.8C2 8.8 2 12 2 12s0 3.2.4 4.8a2.5 2.5 0 0 0 1.8 1.8c1.6.4 7.8.4 7.8.4s6.2 0 7.8-.4a2.5 2.5 0 0 0 1.8-1.8c.4-1.6.4-4.8.4-4.8s0-3.2-.4-4.8zM10 15V9l5.2 3L10 15z"/></svg></button>
+  <button id="rdb" title="Rádios"><svg viewBox="0 0 24 24"><path d="M3.24 6.15C2.51 6.43 2 7.17 2 8v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8c0-1.11-.89-2-2-2H8.3l8.26-3.34L15.88 1 3.24 6.15zM7 20a3 3 0 1 1 0-6 3 3 0 0 1 0 6zm13-8h-2v-2h-2v2H4V8h16v4z"/></svg></button>
   <button id="rs" title="Reescanear biblioteca"><svg viewBox="0 0 24 24"><path d="M17.65 6.35A7.96 7.96 0 0 0 12 4a8 8 0 1 0 7.73 10h-2.08A6 6 0 1 1 12 6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg></button>
 </header>
 <main id="lib"></main>
@@ -257,6 +296,22 @@ const EN={
   "Este navegador não conseguiu tocar {what}":"This browser couldn't play {what}","o arquivo":"the file",
   "📱 Este dispositivo":"📱 This device","Trocar onde a música toca":"Change where the music plays",
   "Tocando neste dispositivo":"Playing on this device","Tocando no {name}":"Playing on {name}",
+  "Rádios":"Radio","Buscar rádio pelo nome…":"Search stations by name…","País":"Country","Todos os países":"All countries",
+  "Catálogo de rádios: Radio Browser (radio-browser.info)":"Station directory: Radio Browser (radio-browser.info)",
+  "Não consegui falar com o Radio Browser":"Couldn't reach Radio Browser","Favoritas":"Favorites","Ouvidas recentemente":"Recently played",
+  "Resultados":"Results","Mais populares":"Most popular","Nenhuma rádio encontrada.":"No stations found.","Tirar dos favoritos":"Remove from favorites",
+  "Favoritar":"Add to favorites","Adicionada aos favoritos":"Added to favorites","Removida dos favoritos":"Removed from favorites",
+  "AO VIVO":"LIVE","Rádio ao vivo":"Live radio","Esta rádio não informa a música que está tocando.":"This station doesn't say which song is playing.",
+  "Cole o link de um vídeo ou de uma playlist para tocar só o áudio.":"Paste a video or playlist link to play only the audio.",
+  "Playlist · {n} vídeos":"Playlist · {n} videos","Não consegui abrir essa playlist":"Couldn't open this playlist",
+  "Retrospectiva":"Recap","Período":"Period","Meses":"Months","Anos":"Years","ouvindo música":"listening to music","músicas diferentes":"different tracks",
+  "artistas":"artists","dias com música":"days with music","dias seguidos (recorde)":"days in a row (record)","artistas novos":"new artists",
+  "artista":"artist","dia com música":"day with music","dia seguido (recorde)":"day in a row (record)","artista novo":"new artist","música diferente":"different track",
+  "{pct} de tempo ouvindo em relação a {period}":"{pct} listening time compared to {period}","Música do período":"Top track of the period",
+  "{n} vezes":"{n} times","Músicas mais tocadas":"Most played tracks","Álbuns mais ouvidos":"Top albums","Quando você ouve":"When you listen",
+  "Horário com mais músicas: {h}":"Busiest hour: {h}","Dia com mais músicas: {d}":"Busiest day: {d}","{n} reproduções":"{n} plays",
+  "Reproduções por hora do dia":"Plays by hour of the day","Reproduções por dia da semana":"Plays by day of the week",
+  "Nada tocado neste período.":"Nothing played in this period.",
   "O server.py no celular está desatualizado.":"The server.py on the phone is outdated.","Copie a versão nova e reinicie o servidor.":"Copy the new version and restart the server.",
 };
 const T=(s,v)=>{let r=LANG==="en"&&EN[s]||s;if(v)for(const k in v)r=r.split(`{${k}}`).join(v[k]);return r};
@@ -319,11 +374,52 @@ function render(){
   }
 }
 
+// ---------- album color: dominant color of the cover, darkened to sit behind white text
+const tintCache={};
+function albumTint(a){
+  if(tintCache[a.id])return Promise.resolve(tintCache[a.id]);
+  const fallback=`hsl(${hue((a.name||"")+(a.artist||""))} 35% 26%)`;     // same hue as the placeholder cover
+  return new Promise(res=>{
+    const img=new Image();
+    img.onload=()=>{
+      try{
+        const c=document.createElement("canvas");c.width=c.height=24;
+        const x=c.getContext("2d");x.drawImage(img,0,0,24,24);const d=x.getImageData(0,0,24,24).data;
+        let r=0,g=0,b=0,w=0,R=0,G=0,B=0,n=0;
+        for(let i=0;i<d.length;i+=4){
+          const pr=d[i],pg=d[i+1],pb=d[i+2],mx=Math.max(pr,pg,pb),mn=Math.min(pr,pg,pb),l=(mx+mn)/510;
+          R+=pr;G+=pg;B+=pb;n++;
+          if(l<.08||l>.92)continue;                                       // skip near black/white
+          const sat=mx===mn?0:(mx-mn)/(255-Math.abs(mx+mn-255)),wt=sat*(1-Math.abs(l-.5))+.02;   // favor vivid mid tones
+          r+=pr*wt;g+=pg*wt;b+=pb*wt;w+=wt;
+        }
+        res(tintCache[a.id]=darkTint(w>0?[r/w,g/w,b/w]:[R/n,G/n,B/n]));
+      }catch(e){res(tintCache[a.id]=fallback)}
+    };
+    img.onerror=()=>res(tintCache[a.id]=fallback);
+    img.src=`/api/cover/${a.id}?v=${a.cv||0}`;
+  });
+}
+function darkTint([r,g,b]){
+  r/=255;g/=255;b/=255;const mx=Math.max(r,g,b),mn=Math.min(r,g,b),l=(mx+mn)/2,dl=mx-mn;
+  let h=0,s=dl?dl/(1-Math.abs(2*l-1)):0;
+  if(dl)h=mx===r?((g-b)/dl)%6:mx===g?(b-r)/dl+2:(r-g)/dl+4;
+  return `hsl(${Math.round(h*60+360)%360} ${Math.round(Math.min(s,.6)*100)}% ${Math.round(Math.min(Math.max(l,.22),.34)*100)}%)`;
+}
+function setTint(key,a){                    // key: which sheet asked, so a late answer can't tint another one
+  const sh=$("#sheet"),meta=document.querySelector('meta[name="theme-color"]');
+  if(!a){sh.classList.remove("tinted");meta.content="#121212";return}
+  albumTint(a).then(c=>{if(openAlbum!==key)return;sh.style.setProperty("--tint",c);sh.classList.add("tinted");meta.content=c});
+}
+
 let editing=false;
 function renderSheet(){
-  if(openAlbum==="@yt")return renderYT();
+  if(openAlbum==="@yt"){setTint();return renderYT()}
+  if(openAlbum==="@radio"){setTint();return renderRadio()}
+  if(openAlbum==="@retro"){setTint();return renderRetro()}
   if(openAlbum==="@ly")return renderLyrics();
   const a=byId[openAlbum];if(!a)return;
+  setTint(openAlbum,a);
   if(editing)return renderEdit(a);
   const af=albumFmt(a),tot=a.tracks.reduce((s,t)=>s+(t.dur||0),0),discs=new Set(a.tracks.map(t=>t.disc)).size>1;let lastDisc=null;
   $("#sheetBody").innerHTML=`<div class="hero">${cover(a,"",true)}<div class="inf">
@@ -389,35 +485,71 @@ function regYT(y){
   const a={id:y.id,name:y.title,full:y.title,artist:y.artist,year:"",cv:0,yt:true,tracks:[t]};
   trackById[y.id]={t,a};return a;
 }
+function regPL(pl){                         // playlist videos share one tracks list, so the queue is the whole playlist
+  const ts=pl.entries.map((e,i)=>({id:e.id,title:e.title,artist:e.artist,dur:e.dur,fmt:e.fmt,q:e.q,n:i+1,disc:1}));
+  pl.entries.forEach((e,i)=>trackById[e.id]={t:ts[i],a:{id:e.id,name:e.title,full:e.title,artist:e.artist,year:"",cv:0,yt:true,pl:pl.id,tracks:ts}});
+  return ts.map(t=>t.id);
+}
+async function playPlaylist(pl,pos=0){
+  if(!pl.entries){
+    const r=await fetch("/api/yt_playlist?id="+encodeURIComponent(pl.id));
+    if(!r.ok)throw new Error(T("Não consegui abrir essa playlist"));
+    pl=await r.json();
+  }
+  const ids=regPL(pl);
+  return ctl.playQueue(ids,pos,pl.id);
+}
 function renderYT(){
   if(!$("#ytsh"))$("#sheetBody").innerHTML=`<div id="ytsh"><h1>YouTube</h1>
-    <p class="note">${T("Cole o link de um vídeo para tocar só o áudio.")}</p>
+    <p class="note">${T("Cole o link de um vídeo ou de uma playlist para tocar só o áudio.")}</p>
     <form id="ytf"><input id="ytu" type="url" inputmode="url" placeholder="https://youtu.be/…" autocomplete="off" enterkeyhint="go">
       <button class="big" id="ytgo">${PLAY} ${T("Tocar")}</button></form><div id="yterr"></div><div id="ytr"></div></div>`;
-  $("#ytr").innerHTML=ytList.length?`<div class="disc">${T("Tocados recentemente")}</div>`+ytList.map(a=>{const t=a.tracks[0];
+  $("#ytr").innerHTML=ytList.length?`<div class="disc">${T("Tocados recentemente")}</div>`+ytList.map(a=>{
+    if(a.playlist)return `<div class="t" data-pl="${a.id}"><span class="n"></span>${cover({id:a.id,name:a.title,artist:a.artist},"yth")}<span class="ti">${esc(a.title)}<small>${T("Playlist · {n} vídeos",{n:a.count})}${a.artist?" · "+esc(a.artist):""}</small></span><button class="x" data-x="${a.id}" title="${T("Tirar do histórico")}">✕</button></div>`;
+    const t=a.tracks[0];
     return `<div class="t" data-t="${t.id}"><span class="n"></span>${cover(a,"yth")}<span class="ti">${esc(t.title)}<small>${esc(t.artist)}</small></span><span class="d">${t.dur?fmt(t.dur):""}</span><button class="x" data-x="${t.id}" title="${T("Tirar do histórico")}">✕</button></div>`}).join(""):"";
   markPlaying();
 }
-async function addYT(url){                 // registers a video (asks the server/yt-dlp); returns its id
+async function addYT(url){                 // registers a video or a playlist (asks the server/yt-dlp)
   let r;try{r=await (await fetch("/api/yt",{method:"POST",body:JSON.stringify({url})})).json()}
   catch(e){throw new Error(T("Sem conexão com o servidor"))}
   if(!r.ok)throw new Error(r.error||T("Não consegui abrir esse vídeo"));
+  if(r.playlist){
+    const pl=r.playlist;regPL(pl);
+    ytList=[{playlist:true,id:pl.id,title:pl.title,artist:pl.artist,count:pl.count},...ytList.filter(x=>x.id!==pl.id)];
+    return r;
+  }
   ytKnown[r.item.id]=r.item;const a=regYT(r.item);ytList=[a,...ytList.filter(x=>x.id!==a.id)];
-  return r.item.id;
+  return r;
 }
 async function playYT(){
   const u=$("#ytu").value.trim(),b=$("#ytgo");if(!u)return;
   b.classList.add("busy");b.disabled=true;$("#yterr").textContent="";navigator.vibrate?.(10);
   try{
-    const id=await addYT(u);
+    const r=await addYT(u);
     $("#ytu").value="";renderYT();
-    await ctl.playTrack(id);
+    if(r.playlist)await playPlaylist(r.playlist,r.start);
+    else await ctl.playTrack(r.item.id);
   }catch(e){$("#yterr").textContent=e.message}
   finally{b.classList.remove("busy");b.disabled=false}
 }
 async function removeYT(id){
   ytList=ytList.filter(a=>a.id!==id);renderYT();
   try{await fetch("/api/yt_remove",{method:"POST",body:JSON.stringify({id})})}catch(e){}
+}
+
+// ---------- radio stations: each one is a single live "track"
+let regionNames=null;try{regionNames=new Intl.DisplayNames([LOC],{type:"region"})}catch(e){}
+const countryName=st=>{try{return st.countrycode&&regionNames?.of(st.countrycode)||st.country}catch(e){return st.country}};   // "Brazil" -> "Brasil"
+const radioKnown={};
+function regRadio(st){
+  radioKnown[st.id]=st;
+  const t={id:st.id,title:st.title,artist:"",dur:0,fmt:st.fmt,q:st.q,n:0,disc:1,url:st.path,radio:true,country:countryName(st)};
+  const a={id:st.id,name:st.title,full:st.title,artist:countryName(st),year:"",cv:0,radio:true,tracks:[t]};
+  trackById[st.id]={t,a};return a;
+}
+async function loadRadios(){                // favorites and recent stations, so they can be shown/played after a reload
+  try{const d=await (await fetch("/api/radio")).json();R.data=d;[...d.favorites,...d.recent].forEach(regRadio)}catch(e){}
 }
 
 // ---------- played: most played tracks/artists and history (stored by the server in SQLite)
@@ -450,6 +582,7 @@ function renderPlays(){
   if(!d.enabled){$("#lib").innerHTML=`<p class="empty">${T("O histórico está desligado ([history] enabled no config.toml).")}</p>`;return}
   const q=$("#q").value.trim().toLowerCase(),f=x=>!q||[x.title,x.artist,x.album].some(v=>v.toLowerCase().includes(q));
   const per=`<div class="per">${[[7,T("7 dias")],[30,T("30 dias")],[0,T("Sempre")]].map(([v,l])=>`<button data-days="${v}" class="${v===P.days?"on":""}">${l}</button>`).join("")}
+    <button class="pa" id="rtb">✨ ${T("Retrospectiva")}</button>
     <span>${d.total} ${d.total===1?T("reprodução"):T("reproduções")}</span></div>`;
   if(!d.recent.length){$("#lib").innerHTML=per+`<p class="empty">${T("Nada tocado ainda.")}<br>${T("Uma música entra aqui depois de {n} s ouvindo.",{n:playMin})}</p>`;return}
   const top=d.top_tracks.filter(f),rec=d.recent.filter(f);
@@ -471,8 +604,148 @@ async function playFromHistory(id,el){
   finally{el.classList.remove("busy")}
 }
 
+// ---------- radio screen: search Radio Browser by name / country / genre; favorites and recent
+const R={data:null,results:null,tag:""};
+function renderRadio(){
+  if($("#rdsh"))return radioLists();
+  $("#sheetBody").innerHTML=`<div id="rdsh"><h1>${T("Rádios")}</h1>
+    <form id="rdf"><input id="rdq" type="search" placeholder="${T("Buscar rádio pelo nome…")}" autocomplete="off" enterkeyhint="search">
+      <select id="rdc" aria-label="${T("País")}"><option value="">${T("Todos os países")}</option></select>
+      <button class="big">${T("Buscar")}</button></form>
+    <div id="rdtags" class="pas"></div><div id="rderr"></div>
+    <div id="rdlists"><p class="empty">${T("Carregando…")}</p></div>
+    <p class="note" style="margin-top:22px">${T("Catálogo de rádios: Radio Browser (radio-browser.info)")}</p></div>`;
+  radioInit();
+}
+async function radioInit(){
+  try{
+    const get=u=>fetch(u).then(r=>{if(!r.ok)throw new Error();return r.json()});
+    const [ov,cs,tg]=await Promise.all([get("/api/radio"),get("/api/radio/countries"),get("/api/radio/tags")]);
+    if(!$("#rdsh"))return;
+    R.data=ov;[...ov.favorites,...ov.recent].forEach(regRadio);
+    const opts=cs.map(c=>({...c,label:countryName({countrycode:c.code,country:c.name})})).sort((a,b)=>a.label.localeCompare(b.label,LOC));
+    $("#rdc").insertAdjacentHTML("beforeend",opts.map(c=>`<option value="${c.code}">${esc(c.label)} (${c.count})</option>`).join(""));
+    $("#rdc").value=ov.filters.country||"";            // last choice, saved by the server (first time: all countries)
+    R.tag=ov.filters.tag||"";
+    $("#rdtags").innerHTML=tg.map(t=>`<button class="pa${t===R.tag?" on":""}" data-tag="${esc(t)}">${esc(t)}</button>`).join("");
+    radioSearch();
+  }catch(e){if($("#rdlists"))$("#rdlists").innerHTML=`<p class="empty">${T("Não consegui falar com o Radio Browser")}</p>`}
+}
+async function radioSearch(){
+  if(!$("#rdsh"))return;
+  const q=$("#rdq").value.trim(),country=$("#rdc").value;
+  $("#rderr").textContent="";R.results=null;radioLists();
+  try{
+    const r=await fetch("/api/radio/search?"+new URLSearchParams({q,country,tag:R.tag})),d=await r.json();
+    if(!r.ok)throw new Error(d.error);
+    R.results=d;
+  }catch(e){R.results=[];$("#rderr").textContent=e.message||T("Não consegui falar com o Radio Browser")}
+  if(openAlbum==="@radio")radioLists();
+}
+function radioRow(st,favs){
+  const fav=favs.has(st.uuid),sub=[countryName(st),(st.tags||[]).slice(0,3).join(", "),[st.fmt,st.q].filter(Boolean).join(" ")].filter(Boolean).join(" · ");
+  const logo=`<div class="cv" style="--ph:hsl(${hue(st.title)} 35% 28%)">${esc((st.title.match(/[\p{L}\p{N}]/u)||["♪"])[0].toUpperCase())}${st.favicon?`<img loading="lazy" src="${esc(st.favicon)}" referrerpolicy="no-referrer" onload="this.classList.add('ok')" onerror="this.remove()" alt="">`:""}</div>`;
+  return `<div class="hr rr" data-r="${st.uuid}">${logo}<span class="ti"><b>${esc(st.title)}</b><small>${esc(sub)}</small></span>
+    <button class="star${fav?" on":""}" data-fav="${st.uuid}" title="${fav?T("Tirar dos favoritos"):T("Favoritar")}">${fav?"★":"☆"}</button></div>`;
+}
+function radioLists(){
+  if(!$("#rdlists"))return;
+  const d=R.data||{favorites:[],recent:[]},favs=new Set(d.favorites.map(f=>f.uuid)),rec=d.recent.filter(st=>!favs.has(st.uuid)).slice(0,6);
+  const filtered=R.tag||$("#rdc").value||$("#rdq").value.trim();
+  $("#rdlists").innerHTML=
+    (d.favorites.length?`<div class="sec">${T("Favoritas")}</div>`+d.favorites.map(st=>radioRow(st,favs)).join(""):"")+
+    (rec.length?`<div class="sec">${T("Ouvidas recentemente")}</div>`+rec.map(st=>radioRow(st,favs)).join(""):"")+
+    `<div class="sec">${filtered?T("Resultados"):T("Mais populares")}</div>`+
+    (!R.results?`<p class="empty">${T("Buscando…")}</p>`:R.results.length?R.results.map(st=>radioRow(st,favs)).join(""):`<p class="empty">${T("Nenhuma rádio encontrada.")}</p>`);
+  markPlaying();
+}
+async function playRadio(uuid,el){
+  el.classList.add("busy");navigator.vibrate?.(10);
+  try{
+    const r=await (await fetch("/api/radio/select",{method:"POST",body:JSON.stringify({uuid})})).json();
+    if(!r.ok)throw new Error(r.error);
+    regRadio(r.station);
+    if(R.data)R.data.recent=[r.station,...R.data.recent.filter(x=>x.uuid!==uuid)];
+    await ctl.playTrack(r.station.id);radioLists();
+  }catch(e){toast(e.message||T("Sem conexão com o servidor"),6000)}
+  finally{el.classList.remove("busy")}
+}
+async function toggleFav(uuid,btn){
+  const on=!btn.classList.contains("on");
+  try{
+    const r=await (await fetch("/api/radio/favorite",{method:"POST",body:JSON.stringify({uuid,on})})).json();
+    if(!r.ok)throw new Error(r.error);
+    if(R.data)R.data.favorites=r.favorites;r.favorites.forEach(regRadio);radioLists();
+    toast(on?T("Adicionada aos favoritos"):T("Removida dos favoritos"));
+  }catch(e){toast(e.message||T("Sem conexão com o servidor"))}
+}
+
+// ---------- retrospective: a month or a year of listening (radio is not included)
+const RT={periods:null,period:null,data:null};
+const hm=sec=>{const h=Math.floor(sec/3600),m=Math.round(sec%3600/60);return h?`${h}h ${m}min`:`${m}min`};
+const plural=(n,one,many)=>n===1?T(one):T(many);       // singular/plural label
+function monthLabel(id,capital=true){
+  const [y,m]=id.split("-"),s=new Date(+y,+m-1,1).toLocaleDateString(LOC,{month:"long",year:"numeric"});
+  return capital?s.charAt(0).toUpperCase()+s.slice(1):s;
+}
+// previous period, as it reads mid-sentence ("... em relação a setembro de 2026")
+const prevLabel=id=>id.length===4?String(+id-1):monthLabel((([y,m])=>m===1?`${y-1}-12`:`${y}-${String(m-1).padStart(2,"0")}`)(id.split("-").map(Number)),false);
+async function renderRetro(){
+  if($("#rtsh"))return drawRetro();
+  $("#sheetBody").innerHTML=`<div id="rtsh"><h1>✨ ${T("Retrospectiva")}</h1>
+    <select id="rtsel" aria-label="${T("Período")}"></select><div id="rtbody"><p class="empty">${T("Carregando…")}</p></div></div>`;
+  try{RT.periods=await (await fetch("/api/retro")).json()}catch(e){$("#rtbody").innerHTML=`<p class="empty">${T("Sem conexão com o servidor")}</p>`;return}
+  const ms=RT.periods.months,ys=RT.periods.years;
+  if(!ms.length){$("#rtsel").hidden=true;$("#rtbody").innerHTML=`<p class="empty">${T("Nada tocado ainda.")}</p>`;return}
+  const now=new Date(),cur=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}`;
+  $("#rtsel").innerHTML=`<optgroup label="${T("Meses")}">${ms.map(m=>`<option value="${m.id}">${monthLabel(m.id)}</option>`).join("")}</optgroup>
+    <optgroup label="${T("Anos")}">${ys.map(y=>`<option value="${y.id}">${y.id}</option>`).join("")}</optgroup>`;
+  if(![...ms,...ys].some(x=>x.id===RT.period))RT.period=ms.some(m=>m.id===cur)?cur:ms[0].id;
+  $("#rtsel").value=RT.period;loadRetro();
+}
+async function loadRetro(){
+  RT.data=null;drawRetro();
+  try{RT.data=await (await fetch("/api/retro?period="+RT.period)).json()}catch(e){RT.data={error:true}}
+  if(openAlbum==="@retro")drawRetro();
+}
+function bars(values,labels,axis,title){         // one series, so no legend: the title names it
+  const max=Math.max(...values,1),pk=values.indexOf(Math.max(...values));
+  return `<div class="bars" role="img" aria-label="${esc(title)}">${values.map((v,i)=>`<div class="b${i===pk&&v?" pk":""}" title="${esc(labels[i])}: ${T("{n} reproduções",{n:v})}">${i===pk&&v?`<span>${v}</span>`:""}<i style="height:${Math.round(v/max*90)}px"></i></div>`).join("")}</div>
+    <div class="axis">${axis.map(a=>`<span>${esc(a)}</span>`).join("")}</div>
+    <table class="sr"><caption>${esc(title)}</caption>${values.map((v,i)=>`<tr><th>${esc(labels[i])}</th><td>${v}</td></tr>`).join("")}</table>`;
+}
+function drawRetro(){
+  const box=$("#rtbody");if(!box)return;
+  const d=RT.data;
+  if(!d){box.innerHTML=`<p class="empty">${T("Carregando…")}</p>`;return}
+  if(d.error||!d.ok){box.innerHTML=`<p class="empty">${T("Sem conexão com o servidor")}</p>`;return}
+  if(!d.plays){box.innerHTML=`<p class="empty">${T("Nada tocado neste período.")}</p>`;return}
+  const tiles=[[hm(d.seconds),T("ouvindo música")],[d.plays,plural(d.plays,"reprodução","reproduções")],[d.tracks,plural(d.tracks,"música diferente","músicas diferentes")],
+    [d.artists,plural(d.artists,"artista","artistas")],[d.days,plural(d.days,"dia com música","dias com música")],
+    [d.streak,plural(d.streak,"dia seguido (recorde)","dias seguidos (recorde)")],[d.new_artists,plural(d.new_artists,"artista novo","artistas novos")]];
+  const pv=d.previous,pct=pv.seconds?Math.round((d.seconds-pv.seconds)/pv.seconds*100):null;
+  const top=d.top_tracks[0],cv=x=>x.cover?cover({id:x.cover,name:x.title||x.album,artist:x.artist,cv:byId[x.cover]?.cv}):cover({id:"x",name:x.title||x.album,artist:x.artist}).replace(/<img[^>]*>/,"");
+  const hl=h=>LANG==="en"?new Date(2000,0,1,h).toLocaleTimeString("en-US",{hour:"numeric"}):`${h}h`;
+  const wd=(i,f)=>new Date(2024,0,1+i).toLocaleDateString(LOC,{weekday:f});      // 2024-01-01 was a Monday (server: 0 = Monday)
+  const ph=d.hours.indexOf(Math.max(...d.hours)),pw=d.weekdays.indexOf(Math.max(...d.weekdays));
+  box.innerHTML=`<div class="rt-hero">${tiles.map(([v,l])=>`<div class="tile"><b>${esc(v)}</b><small>${l}</small></div>`).join("")}</div>
+    ${pct!==null?`<p class="rt-cmp">${T("{pct} de tempo ouvindo em relação a {period}",{pct:(pct>=0?"+":"")+pct+"%",period:prevLabel(d.period)})}</p>`:""}
+    <div class="rt-top hr${top.available?"":" gone"}" data-h="${esc(top.id)}">${cv(top)}<div><small>${T("Música do período")}</small><b>${esc(top.title)}</b>
+      <small>${esc(top.artist)} · ${T("{n} vezes",{n:top.count})}</small></div></div>
+    <div class="sec">${T("Músicas mais tocadas")}</div>${d.top_tracks.map((x,i)=>playRow(x,i+1,`${x.count}×`)).join("")}
+    <div class="sec">${T("Artistas mais ouvidos")}</div>${d.top_artists.map((a,i)=>`<div class="hr" style="cursor:default"><span class="n">${i+1}</span>
+      <span class="ti"><b>${esc(a.artist)}</b><small>${T("{n} reproduções",{n:a.count})} · ${hm(a.seconds)}</small></span></div>`).join("")}
+    ${d.top_albums.length?`<div class="sec">${T("Álbuns mais ouvidos")}</div><div class="rt-albums">${d.top_albums.map(a=>`<div>${cv(a)}<b>${esc(a.album)}</b><small>${esc(a.artist)} · ${a.count}×</small></div>`).join("")}</div>`:""}
+    <div class="sec">${T("Quando você ouve")}</div>
+    <div class="chart"><p>${T("Horário com mais músicas: {h}",{h:hl(ph)})}</p>
+      ${bars(d.hours,d.hours.map((_,h)=>hl(h)),d.hours.map((_,h)=>h%6===0?hl(h):""),T("Reproduções por hora do dia"))}</div>
+    <div class="chart"><p>${T("Dia com mais músicas: {d}",{d:wd(pw,"long")})}</p>
+      ${bars(d.weekdays,d.weekdays.map((_,i)=>wd(i,"long")),d.weekdays.map((_,i)=>wd(i,"short")),T("Reproduções por dia da semana"))}</div>`;
+  markPlaying();
+}
+
 // ---------- lyrics of the track being played
-let LY={tid:null},lyUserScroll=0;
+let LY={tid:null},lyUserScroll=0,lySeq=0;
 function parseLRC(s){
   const out=[];
   for(const line of s.split(/\r?\n/)){
@@ -487,17 +760,24 @@ const lyForm=(ar,ti)=>`<form id="lyf" class="ed"><label>${T("Artista")}</label><
 function renderLyrics(force){
   const tr=S.track;
   if(!tr){LY={tid:null};$("#sheetBody").innerHTML=`<p class="empty">${T("Nada tocando.")}</p>`;return}
-  if(!force&&LY.tid===tr.id&&$("#lyv"))return;
-  LY={tid:tr.id,lines:null,idx:-1};
+  const key=tr.radio?tr.id+"|"+(tr.live||""):tr.id;          // radio: new lyrics when the song on air changes
+  if(!force&&LY.key===key&&$("#lyv"))return;
+  LY={tid:tr.id,key,lines:null,idx:-1};
   const a=byId[tr.album]||trackById[tr.id]?.a||{id:tr.album,name:tr.album_name,artist:""};
   $("#sheetBody").innerHTML=`<div id="lyv"><div class="lyh">${cover(a,"",true)}<div><b>${esc(tr.title)}</b><small>${esc(tr.artist||tr.album_artist)}</small></div></div>
     <div id="lyc"><p class="empty">${T("Buscando letra…")}</p></div></div>`;
+  if(tr.radio){                              // stations send "Artist - Song" (ICY metadata), when they send anything
+    const m=(tr.live||"").split(/\s+-\s+/);
+    if(m.length<2){$("#lyc").innerHTML=`<p class="empty">${T("Esta rádio não informa a música que está tocando.")}</p>`;return}
+    return fetchLyrics(tr.id,m[0].trim(),m.slice(1).join(" - ").trim());
+  }
   fetchLyrics(tr.id);
 }
 async function fetchLyrics(tid,artist,title){
   const p=new URLSearchParams({id:tid});if(artist!=null){p.set("artist",artist);p.set("title",title)}
+  const seq=++lySeq;
   let r;try{r=await (await fetch("/api/lyrics?"+p)).json()}catch(e){r={ok:false,error:T("Sem conexão com o servidor")}}
-  if(LY.tid!==tid||openAlbum!=="@ly")return;
+  if(seq!==lySeq||LY.tid!==tid||openAlbum!=="@ly")return;
   LY.lines=null;LY.idx=-1;
   const form=lyForm(r.artist??S.track?.artist??"",r.title??S.track?.title??"");
   let h;
@@ -586,25 +866,33 @@ function markPlaying(){
     n.innerHTML=on&&S.state!=="stopped"?`<span class="eq${S.state==="paused"?" paused":""}"><i></i><i></i><i></i></span>`:(t?.n||"");
   });
   document.querySelectorAll(".al").forEach(e=>e.classList.toggle("on",!!S.track&&e.dataset.a===S.track.album));
-  document.querySelectorAll(".hr").forEach(e=>e.classList.toggle("on",!!S.track&&e.dataset.h===S.track.id));
+  document.querySelectorAll(".hr").forEach(e=>e.classList.toggle("on",!!S.track&&(e.dataset.h===S.track.id||"radio_"+e.dataset.r===S.track.id)));
 }
 
 function show(s){
-  const prevId=S.track?.id;S=s;recvAt=performance.now();
+  const prevId=S.track?.id,prevLive=S.track?.live;S=s;recvAt=performance.now();
   $("#pp").innerHTML=s.state==="playing"?PAUSE:PLAY;
-  $("#err").textContent=s.error||"";
+  if($("#err").textContent!==(s.error||"")){$("#err").textContent=s.error||"";fitBar()}
   if(s.track?.id!==prevId){
     const a=s.track&&(byId[s.track.album]||trackById[s.track.id]?.a);
-    $("#now").innerHTML=s.track?`${cover(a||{id:s.track.album,name:s.track.album_name,artist:""},"",true)}<div class="tx"><b>${esc(s.track.title)}</b><small>${esc(s.track.artist||s.track.album_artist)} — ${esc(s.track.album_name)}</small></div>`:`<div class="tx"><small>${T("Nada tocando")}</small></div>`;
+    $("#now").innerHTML=s.track?`${cover(a||{id:s.track.album,name:s.track.album_name,artist:""},"",true)}<div class="tx"><b>${esc(s.track.title)}</b><small>${nowSub(s.track)}</small></div>`:`<div class="tx"><small>${T("Nada tocando")}</small></div>`;
     document.title=s.track?`${s.track.title} - MusicWeb`:"MusicWeb";
     $("#nowfmt").innerHTML=s.track?fmtBadge(s.track.fmt,s.track.q):"";
     if(mode==="local")mediaMeta();
     if(openAlbum==="@ly")renderLyrics();
     if(view==="plays"&&prevId){P.data=null;renderPlays()}
+  }else if(s.track?.radio&&s.track.live!==prevLive){      // radio: the song on air changed
+    const sm=$("#now .tx small");if(sm)sm.innerHTML=nowSub(s.track);
+    if(openAlbum==="@ly")renderLyrics();
   }
   if(mode==="remote"&&s.lib!=null&&libVer!=null&&s.lib!==libVer){libVer=s.lib;load()}
   if(s.volume!=null&&!volDragging){$("#vr").value=s.volume;$("#vl").textContent=s.volume+"%"}
   markPlaying();tick();
+}
+
+function nowSub(tr){
+  if(tr.radio)return `<span class="live">${T("AO VIVO")}</span> ${esc(tr.live||trackById[tr.id]?.t.country||tr.album_name||"")}`;
+  return `${esc(tr.artist||tr.album_artist)} — ${esc(tr.album_name)}`;
 }
 
 function tick(){
@@ -613,7 +901,7 @@ function tick(){
   const d=S.dur||0;t=d?Math.min(t,d):t;
   lyTick(t);
   $("#prog .fl").style.width=d&&S.track?(t/d*100)+"%":"0";
-  $("#tc").textContent=S.track?fmt(t):"";$("#td").textContent=S.track&&d?fmt(d):"";
+  $("#tc").textContent=S.track?fmt(t):"";$("#td").textContent=S.track?.radio?T("AO VIVO"):S.track&&d?fmt(d):"";
 }
 
 // ---------- audio output: "remote" = phone on the receiver, "local" = this device
@@ -628,7 +916,8 @@ function localStatus(){
   const st=!ti?"stopped":(!au.paused?"playing":(au.ended?"stopped":"paused"));
   return {state:st,time:au.currentTime||0,dur:isFinite(au.duration)&&au.duration?au.duration:(ti?ti.t.dur:0),
     volume:Math.round(au.volume*100),error:L.err,
-    track:ti&&{id:ti.t.id,title:ti.t.title,artist:ti.t.artist,album:ti.a.id,album_name:ti.a.yt?"YouTube":ti.a.name,album_artist:ti.a.artist,fmt:ti.t.fmt,q:ti.t.q}};
+    track:ti&&{id:ti.t.id,title:ti.t.title,artist:ti.t.artist,album:ti.a.id,album_name:ti.t.radio?ti.t.country:ti.a.yt?"YouTube":ti.a.name,album_artist:ti.a.artist,
+      fmt:ti.t.fmt,q:ti.t.q,radio:!!ti.t.radio,live:""}};
 }
 const lshow=()=>{if(mode==="local")show(localStatus())};
 
@@ -636,7 +925,7 @@ let LC={tid:null};                          // listening counter for the current
 function localPlay(queue,pos,t=0,autoplay=true){
   if(pos<0||pos>=queue.length){localStop();return}
   L.queue=queue;L.pos=pos;L.err="";LC={tid:queue[pos],heard:0,last:null,counted:false};
-  au.src="/api/stream/"+queue[pos];
+  au.src=trackById[queue[pos]]?.t.url||"/api/stream/"+queue[pos];       // radio: the stream itself
   if(t>1)au.addEventListener("loadedmetadata",()=>{au.currentTime=t},{once:true});
   if(autoplay)au.play().catch(e=>{L.err=e.name==="NotAllowedError"?T("Toque em ▶ para começar a tocar aqui"):T("Não consegui tocar: ")+e.message;lshow()});
   lshow();
@@ -651,7 +940,7 @@ au.addEventListener("error",()=>{
 });
 ["play","pause","loadedmetadata"].forEach(ev=>au.addEventListener(ev,lshow));
 au.addEventListener("timeupdate",()=>{
-  if(mode!=="local"||!historyOn||!LC.tid||LC.counted)return;
+  if(mode!=="local"||!historyOn||!LC.tid||LC.counted||trackById[LC.tid]?.t.radio)return;   // radio is not counted
   const t=au.currentTime;
   if(LC.last!=null){const dt=t-LC.last;if(dt>0&&dt<2)LC.heard+=dt}   // jumps (seeking) don't count
   LC.last=t;
@@ -665,7 +954,7 @@ au.addEventListener("timeupdate",()=>{
 function mediaMeta(){
   if(!("mediaSession" in navigator))return;
   const ti=trackById[L.queue[L.pos]];if(!ti)return;
-  try{navigator.mediaSession.metadata=new MediaMetadata({title:ti.t.title,artist:ti.t.artist||ti.a.artist,album:ti.a.name,
+  try{navigator.mediaSession.metadata=new MediaMetadata({title:ti.t.title,artist:ti.t.radio?T("Rádio ao vivo"):ti.t.artist||ti.a.artist,album:ti.t.radio?ti.t.country:ti.a.name,
     artwork:[{src:`/api/cover/${ti.a.id}?v=${ti.a.cv||0}`,sizes:"512x512"}]})}catch(e){}
 }
 if("mediaSession" in navigator){
@@ -678,6 +967,8 @@ if("mediaSession" in navigator){
 // every control works in both modes
 const ctl={
   playAlbum(aid,btn){const a=byId[aid];if(mode==="local")localPlay(a.tracks.map(t=>t.id),0);else return api("play",{album:aid},btn)},
+  playQueue(ids,pos=0,plid){if(mode==="local"){localPlay(ids,pos);return Promise.resolve()}
+    return plid?api("play",{playlist:plid,pos}):api("play",{queue:ids,pos})},
   playTrack(tid){const ti=trackById[tid];if(mode==="local"){const q=ti.a.tracks.map(t=>t.id);localPlay(q,q.indexOf(tid));return Promise.resolve()}
     return api("play",{id:tid})},
   toggle(btn){
@@ -728,10 +1019,17 @@ async function switchOutput(){
 }
 $("#out").onclick=switchOutput;
 
+// the player bar changes height (volume slider, error line, screen width): keep the page's
+// bottom padding equal to it, so the last tracks can always be scrolled out from under it
+function fitBar(){document.documentElement.style.setProperty("--barh",$("#bar").offsetHeight+"px")}
+if("ResizeObserver" in window)new ResizeObserver(fitBar).observe($("#bar"));
+fitBar();addEventListener("resize",fitBar);
+
 // events
 document.querySelector(".seg").onclick=e=>{const b=e.target.closest("button");if(!b)return;view=b.dataset.v;try{localStorage.setItem("view",view)}catch(e){};if(view==="plays")P.data=null;render()};
 $("#q").oninput=render;
 $("#lib").onclick=e=>{
+  if(e.target.closest("#rtb")){openSheet("@retro");return}
   const pd=e.target.closest(".per button");if(pd){P.days=+pd.dataset.days;try{localStorage.setItem("pdays",P.days)}catch(e){};P.data=null;renderPlays();return}
   const pa=e.target.closest(".pa");if(pa){view="artists";$("#q").value=pa.dataset.artist;try{localStorage.setItem("view",view)}catch(e){};render();return}
   const hr=e.target.closest(".hr");if(hr){playFromHistory(hr.dataset.h,hr);return}
@@ -744,11 +1042,17 @@ function openSheet(id){
   if(!wasOpen)history.pushState({sheet:1},"");
   $("#lyb").classList.toggle("on",id==="@ly");
 }
-function closeSheet(){$("#sheet").classList.remove("open");openAlbum=null;editing=false;$("#lyb").classList.remove("on")}
+function closeSheet(){$("#sheet").classList.remove("open");openAlbum=null;editing=false;$("#lyb").classList.remove("on");setTint()}
 $("#back").onclick=()=>history.back();
 window.onpopstate=closeSheet;
 $("#sheetBody").onclick=e=>{
   const x=e.target.closest("[data-x]");if(x){removeYT(x.dataset.x);return}
+  const fv=e.target.closest("[data-fav]");if(fv){toggleFav(fv.dataset.fav,fv);return}
+  const rr=e.target.closest(".rr");if(rr){playRadio(rr.dataset.r,rr);return}
+  const tg=e.target.closest("[data-tag]");if(tg){R.tag=R.tag===tg.dataset.tag?"":tg.dataset.tag;
+    document.querySelectorAll("[data-tag]").forEach(b=>b.classList.toggle("on",b.dataset.tag===R.tag));radioSearch();return}
+  const pl=e.target.closest("[data-pl]");if(pl){pl.classList.add("busy");playPlaylist({id:pl.dataset.pl}).catch(err=>toast(err.message,6000)).finally(()=>pl.classList.remove("busy"));return}
+  const hh=e.target.closest(".hr[data-h]");if(hh){playFromHistory(hh.dataset.h,hh);return}
   if(e.target.closest("#lyre")){e.preventDefault();const w=$("#lyfw");w.hidden=!w.hidden;if(!w.hidden)w.scrollIntoView({behavior:"smooth",block:"center"});return}
   const lp=e.target.closest(".ly p[data-i]");if(lp&&S.track?.id===LY.tid){ctl.seek(LY.lines[+lp.dataset.i].t);lyUserScroll=0;return}
   if(e.target.closest("#editAlbum")){editing=true;renderSheet();$("#sheet").scrollTop=0;return}
@@ -763,15 +1067,21 @@ $("#sheetBody").onclick=e=>{
   const b=e.target.closest("#playAll");if(b){ctl.playAlbum(openAlbum,b);return}
   const t=e.target.closest(".t");if(t){t.classList.add("busy");Promise.resolve(ctl.playTrack(t.dataset.t)).finally(()=>t.classList.remove("busy"))}
 };
-$("#sheetBody").onchange=e=>{if(e.target.id==="e_file"&&e.target.files[0])uploadCover(e.target.files[0])};
+$("#sheetBody").onchange=e=>{
+  if(e.target.id==="e_file"&&e.target.files[0])uploadCover(e.target.files[0]);
+  if(e.target.id==="rdc")radioSearch();
+  if(e.target.id==="rtsel"){RT.period=e.target.value;loadRetro()}
+};
 $("#sheetBody").onsubmit=e=>{
   if(e.target.id==="csf"){e.preventDefault();searchCovers()}
   if(e.target.id==="ytf"){e.preventDefault();playYT()}
+  if(e.target.id==="rdf"){e.preventDefault();radioSearch()}
   if(e.target.id==="lyf"){e.preventDefault();e.target.querySelector("button").classList.add("busy");
     fetchLyrics(LY.tid,$("#lya").value.trim(),$("#lyt").value.trim())}
 };
-$("#now").onclick=()=>{if(S.track&&!$("#sheet").classList.contains("open"))openSheet(byId[S.track.album]?S.track.album:"@yt")};
+$("#now").onclick=()=>{if(S.track&&!$("#sheet").classList.contains("open"))openSheet(byId[S.track.album]?S.track.album:S.track.radio?"@radio":"@yt")};
 $("#ytb").onclick=()=>{openSheet("@yt");$("#ytu").focus()};
+$("#rdb").onclick=()=>openSheet("@radio");
 $("#lyb").onclick=()=>{navigator.vibrate?.(10);if(openAlbum==="@ly")history.back();else openSheet("@ly")};
 $("#pp").onclick=e=>ctl.toggle(e.currentTarget);
 $("#nx").onclick=e=>ctl.next(e.currentTarget);
@@ -782,7 +1092,7 @@ $("#prog").onclick=e=>{if(!S.dur||!S.track)return;const r=e.currentTarget.getBou
   ctl.seek(t)};
 
 let volDragging=false,volTimer=null;
-$("#vol").onclick=e=>{navigator.vibrate?.(10);$("#volpop").classList.toggle("open");e.currentTarget.classList.toggle("on")};
+$("#vol").onclick=e=>{navigator.vibrate?.(10);$("#volpop").classList.toggle("open");e.currentTarget.classList.toggle("on");fitBar()};
 $("#vr").oninput=e=>{volDragging=true;const v=+e.target.value;$("#vl").textContent=v+"%";
   clearTimeout(volTimer);volTimer=setTimeout(()=>ctl.volume(v).finally(()=>volDragging=false),120)};
 $("#vdn").onclick=e=>ctl.volDelta(-5,e.currentTarget);
@@ -795,8 +1105,11 @@ async function load(){
   lib=d.albums;byId={};trackById={};playerName=d.player||"Receiver";renderOut();
   historyOn=d.history!==false;playMin=d.play_min||30;
   lib.forEach(a=>{byId[a.id]=a;a.tracks.forEach(t=>trackById[t.id]={t,a})});
-  (d.yt||[]).forEach(y=>ytKnown[y.id]=y);Object.values(ytKnown).forEach(regYT);   // keep what is playing even if it left the history
-  ytList=(d.yt||[]).map(y=>trackById[y.id].a);render();if(openAlbum&&!editing)renderSheet();   // don't wipe a form being edited
+  const vids=(d.yt||[]).filter(y=>!y.playlist);
+  vids.forEach(y=>ytKnown[y.id]=y);Object.values(ytKnown).forEach(regYT);   // keep what is playing even if it left the history
+  ytList=(d.yt||[]).map(y=>y.playlist?y:trackById[y.id].a);
+  Object.values(radioKnown).forEach(regRadio);
+  loadRadios();render();if(openAlbum&&!editing)renderSheet();   // don't wipe a form being edited
 }
 async function poll(){
   try{

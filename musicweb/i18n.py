@@ -29,6 +29,10 @@ EN = {
     "este vídeo é privado ou não está disponível": "this video is private or unavailable",
     "não achei o áudio deste vídeo": "couldn't find the audio of this video",
     "Não reconheci esse link do YouTube": "That doesn't look like a YouTube link",
+    "Não achei vídeos nessa playlist": "Couldn't find videos in this playlist",
+    # radio
+    "Não consegui falar com o Radio Browser": "Couldn't reach Radio Browser",
+    "Rádio não encontrada": "Station not found",
     # covers
     "álbum não encontrado": "album not found",
     "o arquivo não parece ser uma imagem": "the file doesn't look like an image",

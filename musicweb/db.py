@@ -30,6 +30,9 @@ MIGRATIONS = [
     CREATE INDEX plays_track ON plays(track_id, played_at);
     CREATE TABLE kv (key TEXT PRIMARY KEY, value TEXT NOT NULL);
     """,
+    # plays.dur: track length in seconds (hours listened). No SQL comment here: SQLite copies the
+    # column definition, comments included, into the stored CREATE TABLE and would break it.
+    "ALTER TABLE plays ADD COLUMN dur INTEGER NOT NULL DEFAULT 0",
 ]
 
 
