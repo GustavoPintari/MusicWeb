@@ -184,17 +184,17 @@ a.btn2:active{transform:scale(.92);filter:brightness(1.35)}
 
 <header>
   <input id="q" placeholder="Buscar álbum, artista ou faixa…" autocomplete="off">
-  <div class="seg"><button data-v="albums">Álbuns</button><button data-v="artists">Artistas</button><button data-v="plays">Tocadas</button></div>
+  <div class="seg"><button data-v="albums" data-t>Álbuns</button><button data-v="artists" data-t>Artistas</button><button data-v="plays" data-t>Tocadas</button></div>
   <button id="ytb" title="Tocar do YouTube"><svg viewBox="0 0 24 24"><path d="M21.6 7.2a2.5 2.5 0 0 0-1.8-1.8C18.2 5 12 5 12 5s-6.2 0-7.8.4a2.5 2.5 0 0 0-1.8 1.8C2 8.8 2 12 2 12s0 3.2.4 4.8a2.5 2.5 0 0 0 1.8 1.8c1.6.4 7.8.4 7.8.4s6.2 0 7.8-.4a2.5 2.5 0 0 0 1.8-1.8c.4-1.6.4-4.8.4-4.8s0-3.2-.4-4.8zM10 15V9l5.2 3L10 15z"/></svg></button>
   <button id="rs" title="Reescanear biblioteca"><svg viewBox="0 0 24 24"><path d="M17.65 6.35A7.96 7.96 0 0 0 12 4a8 8 0 1 0 7.73 10h-2.08A6 6 0 1 1 12 6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg></button>
 </header>
 <main id="lib"></main>
 
-<section id="sheet"><div class="top"><button id="back">‹ Voltar</button></div><div id="sheetBody"></div></section>
+<section id="sheet"><div class="top"><button id="back" data-t>‹ Voltar</button></div><div id="sheetBody"></div></section>
 
 <div id="toast"></div>
 <div id="bar">
-  <div id="outrow"><button id="out"></button><div class="orr"><span id="nowfmt"></span><button id="lyb" title="Letra da música">🎤 Letra</button></div></div>
+  <div id="outrow"><button id="out"></button><div class="orr"><span id="nowfmt"></span><button id="lyb" title="Letra da música" data-t>🎤 Letra</button></div></div>
   <div id="pg"><span id="tc"></span><div id="prog"><div class="tr"><div class="fl"></div></div></div><span id="td"></span></div>
   <div class="pl">
     <div id="now"></div>
@@ -219,6 +219,56 @@ a.btn2:active{transform:scale(.92);filter:brightness(1.35)}
 const PLAY='<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>';
 const PAUSE='<svg viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>';
 const $=s=>document.querySelector(s);
+
+// ---------- interface language: the server sets <html lang> from [interface] language in config.toml.
+// Portuguese text is the key; EN maps it to English. T("{n} faixas",{n:3}) fills placeholders.
+const LANG=document.documentElement.lang.toLowerCase().startsWith("en")?"en":"pt-BR",LOC=LANG==="en"?"en-US":"pt-BR";
+const EN={
+  "Música":"Music","Buscar álbum, artista ou faixa…":"Search albums, artists or tracks…","Álbuns":"Albums","Artistas":"Artists","Tocadas":"Played",
+  "Tocar do YouTube":"Play from YouTube","Reescanear biblioteca":"Rescan library","‹ Voltar":"‹ Back","Letra da música":"Lyrics","🎤 Letra":"🎤 Lyrics",
+  "Anterior":"Previous","Tocar/Pausar":"Play/Pause","Próxima":"Next","Volume":"Volume","Parar":"Stop","Diminuir volume":"Volume down","Aumentar volume":"Volume up",
+  "Sem conexão com o servidor":"No connection to the server","Erro na página: ":"Page error: ",
+  "Nada encontrado":"Nothing found","Nenhuma música encontrada":"No music found","álbum":"album","álbuns":"albums","faixa":"track","faixas":"tracks","{n} faixas":"{n} tracks",
+  "Tocar álbum":"Play album","⬇ Baixar":"⬇ Download","✎ Editar":"✎ Edit","Disco {n}":"Disc {n}",
+  "Desconhecido":"Unknown","Vários artistas":"Various artists",
+  "Editar álbum":"Edit album","🖼 Enviar imagem":"🖼 Upload image","🔎 Buscar capa":"🔎 Find cover","Buscar":"Search","Nome do álbum":"Album name",
+  "Artista do álbum":"Album artist","Ano":"Year","Faixas (nº, título e artista)":"Tracks (no., title and artist)","Número":"Number","Título":"Title",
+  "Artista da faixa":"Track artist","Artista":"Artist","As alterações são gravadas nas tags dos arquivos de música.":"Changes are written to the music files' tags.",
+  "Salvar":"Save","Cancelar":"Cancel","🗑 Remover álbum":"🗑 Remove album","Remover":"Remove",
+  "Os arquivos vão para a lixeira e podem ser recuperados.":"The files go to the trash and can be recovered.",
+  "Apagar definitivamente (não dá para desfazer)":"Delete permanently (cannot be undone)",
+  "O nome do álbum não pode ficar vazio.":"The album name can't be empty.","Algumas alterações falharam:":"Some changes failed:",
+  "Cole o link de um vídeo para tocar só o áudio.":"Paste a video link to play only its audio.","Tocar":"Play","Tocados recentemente":"Recently played",
+  "Tirar do histórico":"Remove from history","Não consegui abrir esse vídeo":"Couldn't open this video",
+  "agora":"now","há {n} min":"{n} min ago","hoje {hm}":"today {hm}","ontem {hm}":"yesterday {hm}","Não está mais na biblioteca":"No longer in the library",
+  "Carregando…":"Loading…","O histórico está desligado ([history] enabled no config.toml).":"History is turned off ([history] enabled in config.toml).",
+  "7 dias":"7 days","30 dias":"30 days","Sempre":"All time","reprodução":"play","reproduções":"plays","Nada tocado ainda.":"Nothing played yet.",
+  "Uma música entra aqui depois de {n} s ouvindo.":"A track shows up here after {n} s of listening.","Mais tocadas":"Most played",
+  "Nada neste período.":"Nothing in this period.","Artistas mais ouvidos":"Top artists","Histórico":"History",
+  "Essa faixa não está mais na biblioteca":"This track is no longer in the library",
+  "Nome da música":"Song title","Buscar letra":"Find lyrics","Nada tocando.":"Nothing playing.","Nada tocando":"Nothing playing","Buscando letra…":"Looking for lyrics…",
+  "Não encontrei a letra desta música.":"Couldn't find lyrics for this track.","Confira o nome e tente de novo:":"Check the name and try again:",
+  "Letra":"Lyrics","sincronizada (toque numa linha para pular até ela)":"synced (tap a line to jump to it)","Letra errada? Buscar outra":"Wrong lyrics? Search again",
+  "Capa atualizada":"Cover updated","falha ao converter":"conversion failed","não consegui abrir a imagem":"couldn't open the image",
+  "Erro ao enviar a capa: ":"Error uploading the cover: ","Buscando…":"Searching…","Nada encontrado. Tente outro termo.":"Nothing found. Try another search.",
+  "Erro ao trocar a capa: ":"Error changing the cover: ","Alguns arquivos não foram removidos:":"Some files were not removed:",
+  "\"{name}\" apagado":"\"{name}\" deleted","\"{name}\" movido para a lixeira":"\"{name}\" moved to the trash",
+  "Toque em ▶ para começar a tocar aqui":"Tap ▶ to start playing here","Não consegui tocar: ":"Couldn't play: ",
+  "Este navegador não conseguiu tocar {what}":"This browser couldn't play {what}","o arquivo":"the file",
+  "📱 Este dispositivo":"📱 This device","Trocar onde a música toca":"Change where the music plays",
+  "Tocando neste dispositivo":"Playing on this device","Tocando no {name}":"Playing on {name}",
+  "O server.py no celular está desatualizado.":"The server.py on the phone is outdated.","Copie a versão nova e reinicie o servidor.":"Copy the new version and restart the server.",
+};
+const T=(s,v)=>{let r=LANG==="en"&&EN[s]||s;if(v)for(const k in v)r=r.split(`{${k}}`).join(v[k]);return r};
+function i18nStatic(){                      // texts written directly in the HTML above
+  document.documentElement.lang=LANG;document.title=T(document.title);
+  if(LANG!=="en")return;
+  document.querySelectorAll("[data-t]").forEach(e=>e.textContent=T(e.textContent));
+  document.querySelectorAll("[title]").forEach(e=>e.title=T(e.title));
+  document.querySelectorAll("[placeholder]").forEach(e=>e.placeholder=T(e.placeholder));
+  document.querySelectorAll("[aria-label]").forEach(e=>e.setAttribute("aria-label",T(e.getAttribute("aria-label"))));
+}
+i18nStatic();
 let lib=[],byId={},trackAlbum={},S={state:"stopped"},recvAt=0,openAlbum=null,openArtists=new Set();
 let view="albums";try{view=localStorage.getItem("view")||"albums"}catch(e){}
 
@@ -232,8 +282,8 @@ async function api(p,body,btn){
   try{
     let r;
     try{r=await fetch("/api/"+p,{method:"POST",body:JSON.stringify(body||{})})}
-    catch(e){$("#err").textContent="Sem conexão com o servidor";return}
-    try{show(await r.json())}catch(e){console.error(e);$("#err").textContent="Erro na página: "+e.message}
+    catch(e){$("#err").textContent=T("Sem conexão com o servidor");return}
+    try{show(await r.json())}catch(e){console.error(e);$("#err").textContent=T("Erro na página: ")+e.message}
   }finally{btn?.classList.remove("busy")}
 }
 
@@ -255,15 +305,15 @@ function render(){
   document.querySelectorAll(".seg button").forEach(b=>b.classList.toggle("on",b.dataset.v===view));
   if(view==="plays")return renderPlays();
   const q=$("#q").value.trim().toLowerCase(), list=lib.filter(a=>matches(a,q));
-  if(!list.length){$("#lib").innerHTML=`<p class="empty">${lib.length?"Nada encontrado":"Nenhuma música encontrada"}</p>`;return}
+  if(!list.length){$("#lib").innerHTML=`<p class="empty">${lib.length?T("Nada encontrado"):T("Nenhuma música encontrada")}</p>`;return}
   if(view==="albums"){
-    $("#lib").innerHTML=`<div class="grid">${[...list].sort((a,b)=>a.name.localeCompare(b.name,"pt")).map(card).join("")}</div>`;
+    $("#lib").innerHTML=`<div class="grid">${[...list].sort((a,b)=>a.name.localeCompare(b.name,LOC)).map(card).join("")}</div>`;
   }else{
     const ar={};list.forEach(a=>(ar[a.artist]??=[]).push(a));
-    $("#lib").innerHTML=Object.keys(ar).sort((a,b)=>a.localeCompare(b,"pt")).map(n=>{
+    $("#lib").innerHTML=Object.keys(ar).sort((a,b)=>a.localeCompare(b,LOC)).map(n=>{
       const as=ar[n].sort((a,b)=>(a.year||"9999").localeCompare(b.year||"9999")),open=q||openArtists.has(n);
       return `<div class="ar${open?" open":""}" data-ar="${esc(n)}"><button>${cover({id:"x",name:n,artist:""},"av").replace(/<img[^>]*>/,"")}
-        <span class="nm">${esc(n)}<small>${as.length} ${as.length>1?"álbuns":"álbum"} · ${as.reduce((s,a)=>s+a.tracks.length,0)} faixas</small></span>
+        <span class="nm">${esc(n)}<small>${as.length} ${as.length>1?T("álbuns"):T("álbum")} · ${T("{n} faixas",{n:as.reduce((s,a)=>s+a.tracks.length,0)})}</small></span>
         <svg class="chev" viewBox="0 0 24 24"><path d="M10 6 8.6 7.4 13.2 12l-4.6 4.6L10 18l6-6z"/></svg></button>
         <div class="row">${as.map(card).join("")}</div></div>`}).join("");
   }
@@ -279,33 +329,33 @@ function renderSheet(){
   $("#sheetBody").innerHTML=`<div class="hero">${cover(a,"",true)}<div class="inf">
       <h1>${esc(a.name)}</h1>
       ${a.full!==a.name?`<div class="full">${esc(a.full)}</div>`:""}
-      <div class="meta">${esc(a.artist)}${a.year?" · "+esc(a.year):""} · ${a.tracks.length} faixas${tot?" · "+fmt(tot):""} ${af.mixed?`<span class="fb">${esc(af.f)}</span>`:fmtBadge(af.f,af.q)}</div>
-      <div class="acts"><button class="big" id="playAll">${PLAY} Tocar álbum</button><a class="btn2" id="dlAlbum" href="/api/download/${a.id}" download>⬇ Baixar</a><button id="editAlbum">✎ Editar</button></div></div></div>`+
-    a.tracks.map(t=>{const d=discs&&t.disc!==lastDisc?`<div class="disc">Disco ${t.disc}</div>`:"";lastDisc=t.disc;
+      <div class="meta">${esc(a.artist)}${a.year?" · "+esc(a.year):""} · ${T("{n} faixas",{n:a.tracks.length})}${tot?" · "+fmt(tot):""} ${af.mixed?`<span class="fb">${esc(af.f)}</span>`:fmtBadge(af.f,af.q)}</div>
+      <div class="acts"><button class="big" id="playAll">${PLAY} ${T("Tocar álbum")}</button><a class="btn2" id="dlAlbum" href="/api/download/${a.id}" download>${T("⬇ Baixar")}</a><button id="editAlbum">${T("✎ Editar")}</button></div></div></div>`+
+    a.tracks.map(t=>{const d=discs&&t.disc!==lastDisc?`<div class="disc">${T("Disco {n}",{n:t.disc})}</div>`:"";lastDisc=t.disc;
       return d+`<div class="t" data-t="${t.id}"><span class="n">${t.n||""}</span><span class="ti">${esc(t.title)}${t.artist&&t.artist!==a.artist?`<small>${esc(t.artist)}</small>`:""}</span>${af.mixed?fmtBadge(t.fmt):""}<span class="d">${t.dur?fmt(t.dur):""}</span></div>`}).join("");
   markPlaying();
 }
 
 function renderEdit(a){
-  $("#sheetBody").innerHTML=`<div class="ed"><div class="hero">${cover(a,"",true)}<div class="inf"><h1>Editar álbum</h1><div class="meta">${esc(a.full)}</div>
-      <div class="cvacts"><label class="btn">🖼 Enviar imagem<input type="file" id="e_file" accept="image/*" hidden></label>
-        <button id="e_find">🔎 Buscar capa</button></div></div></div>
-    <div id="cs"><form id="csf"><input id="csq" value="${esc((a.artist==="Desconhecido"||a.artist==="Vários artistas"?"":a.artist+" ")+a.name)}"><button>Buscar</button></form>
+  $("#sheetBody").innerHTML=`<div class="ed"><div class="hero">${cover(a,"",true)}<div class="inf"><h1>${T("Editar álbum")}</h1><div class="meta">${esc(a.full)}</div>
+      <div class="cvacts"><label class="btn">${T("🖼 Enviar imagem")}<input type="file" id="e_file" accept="image/*" hidden></label>
+        <button id="e_find">${T("🔎 Buscar capa")}</button></div></div></div>
+    <div id="cs"><form id="csf"><input id="csq" value="${esc((a.artist===T("Desconhecido")||a.artist===T("Vários artistas")?"":a.artist+" ")+a.name)}"><button>${T("Buscar")}</button></form>
       <div id="csr"></div></div>
-    <label>Nome do álbum</label><input id="e_album" value="${esc(a.full)}">
-    <div class="two"><div><label>Artista do álbum</label><input id="e_aa" value="${esc(a.artist)}"></div>
-      <div><label>Ano</label><input id="e_year" inputmode="numeric" value="${esc(a.year)}"></div></div>
-    <label style="margin-top:18px">Faixas (nº, título e artista)</label>
-    ${a.tracks.map(t=>`<div class="et" data-t="${t.id}"><input class="num" inputmode="numeric" value="${t.n||""}" aria-label="Número">
-      <input class="ti" value="${esc(t.title)}" aria-label="Título"><input class="ar" value="${esc(t.artist)}" placeholder="Artista da faixa" aria-label="Artista"></div>`).join("")}
-    <p class="note">As alterações são gravadas nas tags dos arquivos de música.</p>
+    <label>${T("Nome do álbum")}</label><input id="e_album" value="${esc(a.full)}">
+    <div class="two"><div><label>${T("Artista do álbum")}</label><input id="e_aa" value="${esc(a.artist)}"></div>
+      <div><label>${T("Ano")}</label><input id="e_year" inputmode="numeric" value="${esc(a.year)}"></div></div>
+    <label style="margin-top:18px">${T("Faixas (nº, título e artista)")}</label>
+    ${a.tracks.map(t=>`<div class="et" data-t="${t.id}"><input class="num" inputmode="numeric" value="${t.n||""}" aria-label="${T("Número")}">
+      <input class="ti" value="${esc(t.title)}" aria-label="${T("Título")}"><input class="ar" value="${esc(t.artist)}" placeholder="${T("Artista da faixa")}" aria-label="${T("Artista")}"></div>`).join("")}
+    <p class="note">${T("As alterações são gravadas nas tags dos arquivos de música.")}</p>
     <div class="errs" id="e_err"></div>
-    <div class="acts"><button class="big" id="e_save">Salvar</button><button id="e_cancel">Cancelar</button></div>
-    <div class="danger"><button id="e_del">🗑 Remover álbum</button>
-      <div id="delbox"><p>Remover <b>${esc(a.full)}</b> (${a.tracks.length} ${a.tracks.length>1?"faixas":"faixa"})?
-        Os arquivos vão para a lixeira e podem ser recuperados.</p>
-        <label><input type="checkbox" id="e_perm"> Apagar definitivamente (não dá para desfazer)</label>
-        <div class="acts"><button class="redbtn" id="e_delok">Remover</button><button id="e_delno">Cancelar</button></div></div></div></div>`;
+    <div class="acts"><button class="big" id="e_save">${T("Salvar")}</button><button id="e_cancel">${T("Cancelar")}</button></div>
+    <div class="danger"><button id="e_del">${T("🗑 Remover álbum")}</button>
+      <div id="delbox"><p>${T("Remover")} <b>${esc(a.full)}</b> (${a.tracks.length} ${a.tracks.length>1?T("faixas"):T("faixa")})?
+        ${T("Os arquivos vão para a lixeira e podem ser recuperados.")}</p>
+        <label><input type="checkbox" id="e_perm"> ${T("Apagar definitivamente (não dá para desfazer)")}</label>
+        <div class="acts"><button class="redbtn" id="e_delok">${T("Remover")}</button><button id="e_delno">${T("Cancelar")}</button></div></div></div></div>`;
 }
 
 async function saveEdit(btn){
@@ -320,15 +370,15 @@ async function saveEdit(btn){
     if(val(".ar")!==(t.artist||""))c.artist=val(".ar");
     if(Object.keys(c).length)body.tracks[t.id]=c;
   });
-  if(!body.fields.album&&body.fields.album!==undefined){$("#e_err").textContent="O nome do álbum não pode ficar vazio.";return}
+  if(!body.fields.album&&body.fields.album!==undefined){$("#e_err").textContent=T("O nome do álbum não pode ficar vazio.");return}
   if(!Object.keys(body.fields).length&&!Object.keys(body.tracks).length){editing=false;renderSheet();return}
   btn.classList.add("busy");btn.disabled=true;navigator.vibrate?.(10);
   try{
     const r=await (await fetch("/api/edit",{method:"POST",body:JSON.stringify(body)})).json();
     if(r.album)openAlbum=r.album;
-    if(!r.ok){$("#e_err").textContent="Algumas alterações falharam:\n"+r.errors.join("\n");await load();return}
+    if(!r.ok){$("#e_err").textContent=T("Algumas alterações falharam:")+"\n"+r.errors.join("\n");await load();return}
     editing=false;await load();
-  }catch(e){$("#e_err").textContent="Sem conexão com o servidor"}
+  }catch(e){$("#e_err").textContent=T("Sem conexão com o servidor")}
   finally{btn.classList.remove("busy");btn.disabled=false}
 }
 
@@ -341,17 +391,17 @@ function regYT(y){
 }
 function renderYT(){
   if(!$("#ytsh"))$("#sheetBody").innerHTML=`<div id="ytsh"><h1>YouTube</h1>
-    <p class="note">Cole o link de um vídeo para tocar só o áudio.</p>
+    <p class="note">${T("Cole o link de um vídeo para tocar só o áudio.")}</p>
     <form id="ytf"><input id="ytu" type="url" inputmode="url" placeholder="https://youtu.be/…" autocomplete="off" enterkeyhint="go">
-      <button class="big" id="ytgo">${PLAY} Tocar</button></form><div id="yterr"></div><div id="ytr"></div></div>`;
-  $("#ytr").innerHTML=ytList.length?`<div class="disc">Tocados recentemente</div>`+ytList.map(a=>{const t=a.tracks[0];
-    return `<div class="t" data-t="${t.id}"><span class="n"></span>${cover(a,"yth")}<span class="ti">${esc(t.title)}<small>${esc(t.artist)}</small></span><span class="d">${t.dur?fmt(t.dur):""}</span><button class="x" data-x="${t.id}" title="Tirar do histórico">✕</button></div>`}).join(""):"";
+      <button class="big" id="ytgo">${PLAY} ${T("Tocar")}</button></form><div id="yterr"></div><div id="ytr"></div></div>`;
+  $("#ytr").innerHTML=ytList.length?`<div class="disc">${T("Tocados recentemente")}</div>`+ytList.map(a=>{const t=a.tracks[0];
+    return `<div class="t" data-t="${t.id}"><span class="n"></span>${cover(a,"yth")}<span class="ti">${esc(t.title)}<small>${esc(t.artist)}</small></span><span class="d">${t.dur?fmt(t.dur):""}</span><button class="x" data-x="${t.id}" title="${T("Tirar do histórico")}">✕</button></div>`}).join(""):"";
   markPlaying();
 }
 async function addYT(url){                 // registers a video (asks the server/yt-dlp); returns its id
   let r;try{r=await (await fetch("/api/yt",{method:"POST",body:JSON.stringify({url})})).json()}
-  catch(e){throw new Error("Sem conexão com o servidor")}
-  if(!r.ok)throw new Error(r.error||"Não consegui abrir esse vídeo");
+  catch(e){throw new Error(T("Sem conexão com o servidor"))}
+  if(!r.ok)throw new Error(r.error||T("Não consegui abrir esse vídeo"));
   ytKnown[r.item.id]=r.item;const a=regYT(r.item);ytList=[a,...ytList.filter(x=>x.id!==a.id)];
   return r.item.id;
 }
@@ -380,40 +430,40 @@ async function loadPlays(){
   P.loading=false;if(view==="plays")renderPlays();
 }
 function relTime(at){
-  const d=new Date(at*1000),now=new Date(),s=(now-d)/1000,hm=d.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"});
-  if(s<60)return "agora";
-  if(s<3600)return `há ${Math.floor(s/60)} min`;
+  const d=new Date(at*1000),now=new Date(),s=(now-d)/1000,hm=d.toLocaleTimeString(LOC,{hour:"2-digit",minute:"2-digit"});
+  if(s<60)return T("agora");
+  if(s<3600)return T("há {n} min",{n:Math.floor(s/60)});
   const day=x=>new Date(x.getFullYear(),x.getMonth(),x.getDate()).getTime(),dd=(day(now)-day(d))/86400000;
-  if(dd===0)return `hoje ${hm}`;
-  if(dd===1)return `ontem ${hm}`;
-  return `${d.toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit"})} ${hm}`;
+  if(dd===0)return T("hoje {hm}",{hm});
+  if(dd===1)return T("ontem {hm}",{hm});
+  return `${d.toLocaleDateString(LOC,{day:"2-digit",month:"2-digit"})} ${hm}`;
 }
 function playRow(x,left,right){
   const c=x.cover?cover({id:x.cover,name:x.title,artist:x.artist,cv:byId[x.cover]?.cv}):cover({id:"x",name:x.title,artist:x.artist}).replace(/<img[^>]*>/,"");
-  return `<div class="hr${x.available?"":" gone"}" data-h="${esc(x.id)}" title="${x.available?"":"Não está mais na biblioteca"}"><span class="n">${left}</span>${c}
+  return `<div class="hr${x.available?"":" gone"}" data-h="${esc(x.id)}" title="${x.available?"":T("Não está mais na biblioteca")}"><span class="n">${left}</span>${c}
     <span class="ti"><b>${esc(x.title)}</b><small>${esc(x.artist)}${x.album?" · "+esc(x.album):""}</small></span><span class="d">${right}</span></div>`;
 }
 function renderPlays(){
   const d=P.data;
-  if(!d){$("#lib").innerHTML=`<p class="empty">Carregando…</p>`;if(!P.loading)loadPlays();return}
-  if(d.error){$("#lib").innerHTML=`<p class="empty">Sem conexão com o servidor</p>`;return}
-  if(!d.enabled){$("#lib").innerHTML=`<p class="empty">O histórico está desligado ([history] enabled no config.toml).</p>`;return}
+  if(!d){$("#lib").innerHTML=`<p class="empty">${T("Carregando…")}</p>`;if(!P.loading)loadPlays();return}
+  if(d.error){$("#lib").innerHTML=`<p class="empty">${T("Sem conexão com o servidor")}</p>`;return}
+  if(!d.enabled){$("#lib").innerHTML=`<p class="empty">${T("O histórico está desligado ([history] enabled no config.toml).")}</p>`;return}
   const q=$("#q").value.trim().toLowerCase(),f=x=>!q||[x.title,x.artist,x.album].some(v=>v.toLowerCase().includes(q));
-  const per=`<div class="per">${[[7,"7 dias"],[30,"30 dias"],[0,"Sempre"]].map(([v,l])=>`<button data-days="${v}" class="${v===P.days?"on":""}">${l}</button>`).join("")}
-    <span>${d.total} ${d.total===1?"reprodução":"reproduções"}</span></div>`;
-  if(!d.recent.length){$("#lib").innerHTML=per+`<p class="empty">Nada tocado ainda.<br>Uma música entra aqui depois de ${playMin} s ouvindo.</p>`;return}
+  const per=`<div class="per">${[[7,T("7 dias")],[30,T("30 dias")],[0,T("Sempre")]].map(([v,l])=>`<button data-days="${v}" class="${v===P.days?"on":""}">${l}</button>`).join("")}
+    <span>${d.total} ${d.total===1?T("reprodução"):T("reproduções")}</span></div>`;
+  if(!d.recent.length){$("#lib").innerHTML=per+`<p class="empty">${T("Nada tocado ainda.")}<br>${T("Uma música entra aqui depois de {n} s ouvindo.",{n:playMin})}</p>`;return}
   const top=d.top_tracks.filter(f),rec=d.recent.filter(f);
   $("#lib").innerHTML=per+
-    `<div class="sec">Mais tocadas</div>`+(top.length?top.map((x,i)=>playRow(x,i+1,`${x.count}×`)).join(""):`<p class="empty" style="margin-top:8px">Nada neste período.</p>`)+
-    (d.top_artists.length&&!q?`<div class="sec">Artistas mais ouvidos</div><div class="pas">${d.top_artists.map(a=>`<button class="pa" data-artist="${esc(a.artist)}">${esc(a.artist)}<small>${a.count}</small></button>`).join("")}</div>`:"")+
-    `<div class="sec">Histórico</div>`+rec.map(x=>playRow(x,"",relTime(x.at))).join("");
+    `<div class="sec">${T("Mais tocadas")}</div>`+(top.length?top.map((x,i)=>playRow(x,i+1,`${x.count}×`)).join(""):`<p class="empty" style="margin-top:8px">${T("Nada neste período.")}</p>`)+
+    (d.top_artists.length&&!q?`<div class="sec">${T("Artistas mais ouvidos")}</div><div class="pas">${d.top_artists.map(a=>`<button class="pa" data-artist="${esc(a.artist)}">${esc(a.artist)}<small>${a.count}</small></button>`).join("")}</div>`:"")+
+    `<div class="sec">${T("Histórico")}</div>`+rec.map(x=>playRow(x,"",relTime(x.at))).join("");
   markPlaying();
 }
 async function playFromHistory(id,el){
   el.classList.add("busy");
   try{
     if(!trackById[id]){
-      if(!id.startsWith("yt_")){toast("Essa faixa não está mais na biblioteca");return}
+      if(!id.startsWith("yt_")){toast(T("Essa faixa não está mais na biblioteca"));return}
       await addYT("https://youtu.be/"+id.slice(3));        // left the YouTube history: add it again
     }
     await ctl.playTrack(id);
@@ -432,21 +482,21 @@ function parseLRC(s){
   }
   return out.sort((a,b)=>a.t-b.t);
 }
-const lyForm=(ar,ti)=>`<form id="lyf" class="ed"><label>Artista</label><input id="lya" value="${esc(ar)}">
-  <label>Música</label><input id="lyt" value="${esc(ti)}"><div class="acts" style="margin-top:12px"><button class="big">Buscar letra</button></div></form>`;
+const lyForm=(ar,ti)=>`<form id="lyf" class="ed"><label>${T("Artista")}</label><input id="lya" value="${esc(ar)}">
+  <label>${T("Nome da música")}</label><input id="lyt" value="${esc(ti)}"><div class="acts" style="margin-top:12px"><button class="big">${T("Buscar letra")}</button></div></form>`;
 function renderLyrics(force){
   const tr=S.track;
-  if(!tr){LY={tid:null};$("#sheetBody").innerHTML=`<p class="empty">Nada tocando.</p>`;return}
+  if(!tr){LY={tid:null};$("#sheetBody").innerHTML=`<p class="empty">${T("Nada tocando.")}</p>`;return}
   if(!force&&LY.tid===tr.id&&$("#lyv"))return;
   LY={tid:tr.id,lines:null,idx:-1};
   const a=byId[tr.album]||trackById[tr.id]?.a||{id:tr.album,name:tr.album_name,artist:""};
   $("#sheetBody").innerHTML=`<div id="lyv"><div class="lyh">${cover(a,"",true)}<div><b>${esc(tr.title)}</b><small>${esc(tr.artist||tr.album_artist)}</small></div></div>
-    <div id="lyc"><p class="empty">Buscando letra…</p></div></div>`;
+    <div id="lyc"><p class="empty">${T("Buscando letra…")}</p></div></div>`;
   fetchLyrics(tr.id);
 }
 async function fetchLyrics(tid,artist,title){
   const p=new URLSearchParams({id:tid});if(artist!=null){p.set("artist",artist);p.set("title",title)}
-  let r;try{r=await (await fetch("/api/lyrics?"+p)).json()}catch(e){r={ok:false,error:"Sem conexão com o servidor"}}
+  let r;try{r=await (await fetch("/api/lyrics?"+p)).json()}catch(e){r={ok:false,error:T("Sem conexão com o servidor")}}
   if(LY.tid!==tid||openAlbum!=="@ly")return;
   LY.lines=null;LY.idx=-1;
   const form=lyForm(r.artist??S.track?.artist??"",r.title??S.track?.title??"");
@@ -454,8 +504,8 @@ async function fetchLyrics(tid,artist,title){
   if(r.ok&&r.synced){LY.lines=parseLRC(r.synced);h=`<div class="ly">${LY.lines.map((l,i)=>`<p data-i="${i}">${esc(l.text)||"♪"}</p>`).join("")}</div>`}
   else if(r.ok&&r.plain)h=`<div class="ly plain">${esc(r.plain)}</div>`;
   else if(r.ok&&r.instrumental)h=`<p class="empty">♪ Instrumental</p>`;
-  else h=`<p class="empty">${esc(r.error||"Não encontrei a letra desta música.")}</p><p class="empty" style="margin-top:6px">Confira o nome e tente de novo:</p>`;
-  h+=r.ok?`<p class="lysrc">Letra: ${esc(r.src)}${r.synced?" · sincronizada (toque numa linha para pular até ela)":""} · <a href="#" id="lyre">Letra errada? Buscar outra</a></p><div id="lyfw" hidden>${form}</div>`:form;
+  else h=`<p class="empty">${esc(r.error||T("Não encontrei a letra desta música."))}</p><p class="empty" style="margin-top:6px">${T("Confira o nome e tente de novo:")}</p>`;
+  h+=r.ok?`<p class="lysrc">${T("Letra")}: ${esc(r.src)}${r.synced?" · "+T("sincronizada (toque numa linha para pular até ela)"):""} · <a href="#" id="lyre">${T("Letra errada? Buscar outra")}</a></p><div id="lyfw" hidden>${form}</div>`:form;
   $("#lyc").innerHTML=h;tick();
 }
 function lyTick(t){
@@ -472,7 +522,7 @@ function toast(msg,ms=3500){const t=$("#toast");t.textContent=msg;t.classList.ad
 async function afterCoverChange(){
   await load();const a=byId[openAlbum];
   if(a){const old=document.querySelector(".ed .hero .cv");if(old)old.outerHTML=cover(a,"",true)}
-  toast("Capa atualizada");
+  toast(T("Capa atualizada"));
 }
 
 function shrinkImage(file,max=1200){       // shrink large photos before uploading
@@ -480,8 +530,8 @@ function shrinkImage(file,max=1200){       // shrink large photos before uploadi
     const img=new Image(),url=URL.createObjectURL(file);
     img.onload=()=>{const k=Math.min(1,max/Math.max(img.width,img.height)),c=document.createElement("canvas");
       c.width=Math.round(img.width*k);c.height=Math.round(img.height*k);c.getContext("2d").drawImage(img,0,0,c.width,c.height);
-      URL.revokeObjectURL(url);c.toBlob(b=>b?res(b):rej(new Error("falha ao converter")),"image/jpeg",.9)};
-    img.onerror=()=>{URL.revokeObjectURL(url);rej(new Error("não consegui abrir a imagem"))};
+      URL.revokeObjectURL(url);c.toBlob(b=>b?res(b):rej(new Error(T("falha ao converter"))),"image/jpeg",.9)};
+    img.onerror=()=>{URL.revokeObjectURL(url);rej(new Error(T("não consegui abrir a imagem")))};
     img.src=url;
   });
 }
@@ -493,18 +543,18 @@ async function uploadCover(file){
     const r=await (await fetch("/api/cover_upload?album="+openAlbum,{method:"POST",body:blob})).json();
     if(!r.ok)throw new Error(r.error);
     await afterCoverChange();
-  }catch(e){toast("Erro ao enviar a capa: "+e.message,6000)}
+  }catch(e){toast(T("Erro ao enviar a capa: ")+e.message,6000)}
   finally{lbl.classList.remove("busy")}
 }
 
 async function searchCovers(){
   const q=$("#csq").value.trim();if(!q)return;
-  $("#csr").innerHTML=`<small style="grid-column:1/-1;color:var(--mut)">Buscando…</small>`;
+  $("#csr").innerHTML=`<small style="grid-column:1/-1;color:var(--mut)">${T("Buscando…")}</small>`;
   try{
     const list=await (await fetch("/api/cover_search?q="+encodeURIComponent(q))).json();
-    $("#csr").innerHTML=list.length?list.map((c,i)=>`<div class="c" data-i="${i}"><img src="${esc(c.thumb)}" loading="lazy" alt=""><small>${esc(c.title)}</small><small>${esc(c.artist)} · ${c.src}</small></div>`).join(""):`<small style="grid-column:1/-1">Nada encontrado. Tente outro termo.</small>`;
+    $("#csr").innerHTML=list.length?list.map((c,i)=>`<div class="c" data-i="${i}"><img src="${esc(c.thumb)}" loading="lazy" alt=""><small>${esc(c.title)}</small><small>${esc(c.artist)} · ${c.src}</small></div>`).join(""):`<small style="grid-column:1/-1">${T("Nada encontrado. Tente outro termo.")}</small>`;
     $("#csr")._list=list;
-  }catch(e){$("#csr").innerHTML=`<small style="grid-column:1/-1;color:var(--err)">Sem conexão com o servidor</small>`}
+  }catch(e){$("#csr").innerHTML=`<small style="grid-column:1/-1;color:var(--err)">${T("Sem conexão com o servidor")}</small>`}
 }
 
 async function pickCover(el){
@@ -513,7 +563,7 @@ async function pickCover(el){
     const r=await (await fetch("/api/cover_set",{method:"POST",body:JSON.stringify({album:openAlbum,url:c.url})})).json();
     if(!r.ok)throw new Error(r.error);
     $("#cs").classList.remove("open");await afterCoverChange();
-  }catch(e){toast("Erro ao trocar a capa: "+e.message,6000)}
+  }catch(e){toast(T("Erro ao trocar a capa: ")+e.message,6000)}
   finally{el.classList.remove("busy")}
 }
 
@@ -522,10 +572,10 @@ async function deleteAlbum(btn){
   btn.classList.add("busy");btn.disabled=true;
   try{
     const r=await (await fetch("/api/delete",{method:"POST",body:JSON.stringify({album:openAlbum,permanent})})).json();
-    if(!r.ok){toast("Alguns arquivos não foram removidos:\n"+r.errors.join("\n"),8000)}
-    else toast(permanent?`"${name}" apagado`:`"${name}" movido para a lixeira`);
+    if(!r.ok){toast(T("Alguns arquivos não foram removidos:")+"\n"+r.errors.join("\n"),8000)}
+    else toast(permanent?T('"{name}" apagado',{name}):T('"{name}" movido para a lixeira',{name}));
     editing=false;history.back();await load();
-  }catch(e){toast("Sem conexão com o servidor")}
+  }catch(e){toast(T("Sem conexão com o servidor"))}
   finally{btn.classList.remove("busy");btn.disabled=false}
 }
 
@@ -545,8 +595,8 @@ function show(s){
   $("#err").textContent=s.error||"";
   if(s.track?.id!==prevId){
     const a=s.track&&(byId[s.track.album]||trackById[s.track.id]?.a);
-    $("#now").innerHTML=s.track?`${cover(a||{id:s.track.album,name:s.track.album_name,artist:""},"",true)}<div class="tx"><b>${esc(s.track.title)}</b><small>${esc(s.track.artist||s.track.album_artist)} — ${esc(s.track.album_name)}</small></div>`:`<div class="tx"><small>Nada tocando</small></div>`;
-    document.title=s.track?`${s.track.title} — Música`:"Música";
+    $("#now").innerHTML=s.track?`${cover(a||{id:s.track.album,name:s.track.album_name,artist:""},"",true)}<div class="tx"><b>${esc(s.track.title)}</b><small>${esc(s.track.artist||s.track.album_artist)} — ${esc(s.track.album_name)}</small></div>`:`<div class="tx"><small>${T("Nada tocando")}</small></div>`;
+    document.title=s.track?`${s.track.title} — ${T("Música")}`:T("Música");
     $("#nowfmt").innerHTML=s.track?fmtBadge(s.track.fmt,s.track.q):"";
     if(mode==="local")mediaMeta();
     if(openAlbum==="@ly")renderLyrics();
@@ -588,7 +638,7 @@ function localPlay(queue,pos,t=0,autoplay=true){
   L.queue=queue;L.pos=pos;L.err="";LC={tid:queue[pos],heard:0,last:null,counted:false};
   au.src="/api/stream/"+queue[pos];
   if(t>1)au.addEventListener("loadedmetadata",()=>{au.currentTime=t},{once:true});
-  if(autoplay)au.play().catch(e=>{L.err=e.name==="NotAllowedError"?"Toque em ▶ para começar a tocar aqui":"Não consegui tocar: "+e.message;lshow()});
+  if(autoplay)au.play().catch(e=>{L.err=e.name==="NotAllowedError"?T("Toque em ▶ para começar a tocar aqui"):T("Não consegui tocar: ")+e.message;lshow()});
   lshow();
 }
 function localStop(){au.pause();au.removeAttribute("src");au.load();L.pos=-1;lshow()}
@@ -596,7 +646,7 @@ au.addEventListener("ended",()=>localPlay(L.queue,L.pos+1));
 au.addEventListener("error",()=>{
   if(!au.getAttribute("src"))return;
   const ti=trackById[L.queue[L.pos]];
-  L.err=`Este navegador não conseguiu tocar ${ti?.t.fmt||"o arquivo"}${ti?` (${ti.t.title})`:""}`;lshow();
+  L.err=T("Este navegador não conseguiu tocar {what}",{what:(ti?.t.fmt||T("o arquivo"))+(ti?` (${ti.t.title})`:"")});lshow();
   setTimeout(()=>{if(L.err)localPlay(L.queue,L.pos+1)},2500);
 });
 ["play","pause","loadedmetadata"].forEach(ev=>au.addEventListener(ev,lshow));
@@ -648,8 +698,8 @@ const ctl={
 
 function renderOut(){
   const o=$("#out");o.classList.toggle("local",mode==="local");
-  o.innerHTML=mode==="local"?"📱 Este dispositivo":`📻 ${esc(playerName)}`;
-  o.title="Trocar onde a música toca";
+  o.innerHTML=mode==="local"?T("📱 Este dispositivo"):`📻 ${esc(playerName)}`;
+  o.title=T("Trocar onde a música toca");
 }
 
 // switch output, carrying over the track and position
@@ -665,14 +715,14 @@ async function switchOutput(){
         fetch("/api/pause",{method:"POST"});
         localPlay(q,q.indexOf(ti.t.id),st.time||0,playing);
       }else show(localStatus());
-      toast("Tocando neste dispositivo");
+      toast(T("Tocando neste dispositivo"));
     }else{
       const ti=L.pos>=0&&trackById[L.queue[L.pos]],playing=!au.paused,t=au.currentTime||0;
       au.pause();mode="remote";try{localStorage.setItem("out",mode)}catch(e){}
       S={state:"stopped"};
       if(ti&&(playing||t>0)){await api("play",{id:ti.t.id,t});if(!playing)await api("pause")}
       else await poll();
-      toast(`Tocando no ${playerName}`);
+      toast(T("Tocando no {name}",{name:playerName}));
     }
   }finally{$("#out").classList.remove("busy");renderOut()}
 }
@@ -741,7 +791,7 @@ $("#vup").onclick=e=>ctl.volDelta(5,e.currentTarget);
 let libVer=null;
 async function load(){
   const d=await (await fetch("/api/library")).json();libVer=d.lib;
-  if(d.api!==2){$("#lib").innerHTML=`<p class="empty" style="color:var(--err)">O server.py no celular está desatualizado.<br>Copie a versão nova e reinicie o servidor.</p>`;return}
+  if(d.api!==2){$("#lib").innerHTML=`<p class="empty" style="color:var(--err)">${T("O server.py no celular está desatualizado.")}<br>${T("Copie a versão nova e reinicie o servidor.")}</p>`;return}
   lib=d.albums;byId={};trackById={};playerName=d.player||"Receiver";renderOut();
   historyOn=d.history!==false;playMin=d.play_min||30;
   lib.forEach(a=>{byId[a.id]=a;a.tracks.forEach(t=>trackById[t.id]={t,a})});

@@ -3,6 +3,7 @@ import base64, json, os, re, threading, time
 import urllib.error, urllib.parse
 
 from .config import cfg
+from .i18n import _
 from .state import albums, lock, tracks, yt_items
 from .util import IMG_EXTS, clean_album, http_get, inside_root, mutagen, safe_name, sniff
 from .youtube import yt_thumb
@@ -221,12 +222,12 @@ def set_cover(aid, data):
     with lock:
         a = albums.get(aid)
     if not a:
-        raise ValueError("álbum não encontrado")
+        raise ValueError(_("álbum não encontrado"))
     kind = sniff(data)
     if not (data[:2] == b"\xff\xd8" or kind != "image/jpeg"):
-        raise ValueError("o arquivo não parece ser uma imagem")
+        raise ValueError(_("o arquivo não parece ser uma imagem"))
     if not inside_root(a["dir"]):
-        raise ValueError("pasta do álbum fora da biblioteca")
+        raise ValueError(_("pasta do álbum fora da biblioteca"))
     ext = {"image/png": ".png", "image/webp": ".webp", "image/gif": ".gif", "image/bmp": ".bmp"}.get(kind, ".jpg")
     stem = safe_name(a["full"]) if a["shared"] else "cover"
     ts = time.strftime("%Y%m%d-%H%M%S")
@@ -265,5 +266,5 @@ def cover_candidates(term):
 def cover_from_url(url):
     host = urllib.parse.urlparse(url).hostname or ""
     if not url.startswith("https://") or not any(host == h or host.endswith("." + h) for h in COVER_HOSTS):
-        raise ValueError("endereço de imagem não permitido")
+        raise ValueError(_("endereço de imagem não permitido"))
     return http_get(url, timeout=20)

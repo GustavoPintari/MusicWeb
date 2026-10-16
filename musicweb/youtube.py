@@ -2,6 +2,7 @@
 import importlib.util, json, os, re, shutil, subprocess, sys, threading, time
 
 from .config import cfg
+from .i18n import _
 from .state import lock, state, yt_items
 from .util import http_get
 
@@ -54,26 +55,26 @@ def yt_resolve(vid):
     """Asks yt-dlp for the video data and the direct audio link."""
     cmd = ytdlp_cmd()
     if not cmd:
-        raise ValueError("yt-dlp não está instalado no servidor (pip install yt-dlp)")
+        raise ValueError(_("yt-dlp não está instalado no servidor (pip install yt-dlp)"))
     try:
         extra = ["--cookies", os.path.expanduser(cfg.yt_cookies)] if cfg.yt_cookies else []
         r = subprocess.run(cmd + extra + ["-j", "--no-playlist", "--no-warnings", "-f", cfg.yt_format,
                                           "https://www.youtube.com/watch?v=" + vid],
                            capture_output=True, text=True, timeout=90)
     except subprocess.TimeoutExpired:
-        raise ValueError("o YouTube demorou demais para responder")
+        raise ValueError(_("o YouTube demorou demais para responder"))
     if r.returncode != 0:
         errs = [l for l in r.stderr.splitlines() if "ERROR" in l] or r.stderr.strip().splitlines() or ["erro desconhecido"]
         if "confirm you" in errs[-1] and "bot" in errs[-1]:
-            raise ValueError("o YouTube pediu login para confirmar que não é um robô. Atualize o yt-dlp "
-                             "(pip install -U yt-dlp) ou configure [youtube] cookies no config.toml")
+            raise ValueError(_("o YouTube pediu login para confirmar que não é um robô. Atualize o yt-dlp "
+                               "(pip install -U yt-dlp) ou configure [youtube] cookies no config.toml"))
         if "Private video" in errs[-1] or "unavailable" in errs[-1].lower():
-            raise ValueError("este vídeo é privado ou não está disponível")
+            raise ValueError(_("este vídeo é privado ou não está disponível"))
         raise ValueError(re.sub(r"^ERROR:\s*(\[[^\]]*\]\s*)?(\S+:\s*)?", "", errs[-1]))
     info = json.loads(r.stdout)
     url = info.get("url") or (info.get("requested_formats") or [{}])[0].get("url")
     if not url:
-        raise ValueError("não achei o áudio deste vídeo")
+        raise ValueError(_("não achei o áudio deste vídeo"))
     return info, url, info.get("http_headers") or {}
 
 
@@ -85,7 +86,7 @@ def yt_direct(tid, force=False):
         c = yt_urls.get(tid)
         if c and not force and time.time() - c[2] < 3 * 3600:
             return c
-        _, url, headers = yt_resolve(yt_items[tid]["vid"])
+        _info, url, headers = yt_resolve(yt_items[tid]["vid"])
         c = yt_urls[tid] = (url, headers, time.time())
         return c
 
@@ -107,7 +108,7 @@ def guess_artist_title(title, uploader):
 def yt_add(url):
     vid = yt_vid(url)
     if not vid:
-        return {"ok": False, "error": "Não reconheci esse link do YouTube"}
+        return {"ok": False, "error": _("Não reconheci esse link do YouTube")}
     tid = "yt_" + vid
     with lock:
         y = yt_items.get(tid)

@@ -8,6 +8,7 @@ import json, os, re, time
 from . import db
 from .config import cfg
 from .covers import cover_ver
+from .i18n import name
 from .state import albums, lock, state, tracks, yt_items
 from .util import EXTS, clean_album, mutagen, num, sid
 from .youtube import yt_public
@@ -164,7 +165,8 @@ def library_json():
     with lock:
         out = []
         for a in sorted(albums.values(), key=lambda a: (a["artist"].lower(), a["year"], a["name"].lower())):
-            out.append({**{k: a[k] for k in ("id", "name", "full", "artist", "year", "dur")},
+            out.append({**{k: a[k] for k in ("id", "year", "dur")},
+                        **{k: name(a[k]) for k in ("name", "full", "artist")},     # "Sem álbum" etc. in the UI language
                         "cv": cover_ver.get(a["id"], 0),
                         "tracks": [{k: tracks[i][k] for k in ("id", "title", "artist", "n", "disc", "dur", "fmt", "q")}
                                    for i in a["tracks"]]})

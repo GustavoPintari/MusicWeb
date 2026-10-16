@@ -10,7 +10,7 @@ A self-hosted "Spotify" that runs on an Android phone (Termux). The phone stays 
 
 It only needs the Python standard library. `mutagen` and `yt-dlp` are optional and unlock extra features.
 
-> The web interface is in Portuguese; button names are shown below with their English meaning.
+> The web interface is in Portuguese by default; set `[interface] language = "en"` in `config.toml` for English. Button names below are the Portuguese ones, with their meaning.
 
 ### Features
 
@@ -23,6 +23,7 @@ It only needs the Python standard library. `mutagen` and `yt-dlp` are optional a
 - ▶ **YouTube**: paste a link and play only the audio, on either output.
 - 📊 **Tocadas** (played) tab: most played tracks and artists (last 7 days, 30 days or all time) and the play history.
 - **Queue survives restarts**: after a reboot or crash, the queue comes back paused where it stopped — press play to continue.
+- **Interface in Portuguese (BR) or English** (`[interface] language`).
 - **Fast startup** on large libraries: tags are read once and cached in SQLite; later scans only read new or changed files.
 
 ### Installation (Termux)
@@ -92,6 +93,7 @@ The file is looked up in this order: `--config`, the `MUSICWEB_CONFIG` variable,
 | `[server] host` | `0.0.0.0` | address the server listens on |
 | `[server] port` | `8080` | port |
 | `[server] player_name` | `Receiver` | name of the phone output shown on the page |
+| `[interface] language` | `pt-BR` | interface language: `pt-BR` (Portuguese) or `en` (English) |
 | `[library] music_dir` | `~/storage/music` | music folder |
 | `[library] rescan_every` | `60` | seconds between checks for new music (0 disables) |
 | `[library] trash_dir` | *(next to the library)* | where removed albums go |
@@ -108,7 +110,7 @@ The file is looked up in this order: `--config`, the `MUSICWEB_CONFIG` variable,
 | `[data] dir` | `~/.local/share/musicweb` | `musicweb.db`: scan cache, play history and saved queue |
 
 **Priority:** defaults < `config.toml` < environment variables < command line.
-The older variables still work: `MPV_AO`, `COVERS_ONLINE`, `LYRICS_ONLINE`, `RESCAN_EVERY`, `PLAYER_NAME`, `YT_COOKIES`, `TRASH`, `MUSIC_DIR`.
+The older variables still work: `MPV_AO`, `COVERS_ONLINE`, `LYRICS_ONLINE`, `RESCAN_EVERY`, `PLAYER_NAME`, `YT_COOKIES`, `TRASH`, `MUSIC_DIR`; plus `MUSICWEB_LANGUAGE`.
 
 ### Organizing your music
 
@@ -174,6 +176,7 @@ musicweb/
 ├── youtube.py          yt-dlp, direct links and history
 ├── lyrics.py           lyrics (.lrc, tags, LRCLIB)
 ├── web.py              HTTP server: API routes, streaming and downloads
+├── i18n.py             interface language for server messages (the page has its own dictionary)
 ├── util.py             small shared helpers
 └── static/index.html   the page (HTML, CSS and JS in one file)
 ```
@@ -224,6 +227,7 @@ Só usa a biblioteca padrão do Python. `mutagen` e `yt-dlp` são opcionais e li
 - ▶ **YouTube**: cole um link e toque só o áudio, em qualquer uma das saídas.
 - 📊 Aba **Tocadas**: músicas e artistas mais ouvidos (últimos 7 dias, 30 dias ou sempre) e o histórico de reprodução.
 - **Fila que sobrevive a reinício**: depois de religar o celular ou de uma queda, a fila volta pausada onde parou — é só apertar play.
+- **Interface em português (BR) ou inglês** (`[interface] language`).
 - **Inicialização rápida** em bibliotecas grandes: as tags são lidas uma vez e guardadas no SQLite; as varreduras seguintes só leem arquivos novos ou alterados.
 
 ### Instalação (Termux)
@@ -293,6 +297,7 @@ O arquivo é procurado nesta ordem: `--config`, variável `MUSICWEB_CONFIG`, `./
 | `[server] host` | `0.0.0.0` | endereço em que o servidor escuta |
 | `[server] port` | `8080` | porta |
 | `[server] player_name` | `Receiver` | nome da saída do celular na página |
+| `[interface] language` | `pt-BR` | idioma da interface: `pt-BR` (português) ou `en` (inglês) |
 | `[library] music_dir` | `~/storage/music` | pasta das músicas |
 | `[library] rescan_every` | `60` | segundos entre buscas por músicas novas (0 desliga) |
 | `[library] trash_dir` | *(ao lado da biblioteca)* | para onde vão os álbuns removidos |
@@ -309,7 +314,7 @@ O arquivo é procurado nesta ordem: `--config`, variável `MUSICWEB_CONFIG`, `./
 | `[data] dir` | `~/.local/share/musicweb` | `musicweb.db`: cache da varredura, histórico e fila salva |
 
 **Prioridade:** padrão < `config.toml` < variáveis de ambiente < linha de comando.
-As variáveis antigas continuam valendo: `MPV_AO`, `COVERS_ONLINE`, `LYRICS_ONLINE`, `RESCAN_EVERY`, `PLAYER_NAME`, `YT_COOKIES`, `TRASH`, `MUSIC_DIR`.
+As variáveis antigas continuam valendo: `MPV_AO`, `COVERS_ONLINE`, `LYRICS_ONLINE`, `RESCAN_EVERY`, `PLAYER_NAME`, `YT_COOKIES`, `TRASH`, `MUSIC_DIR`; e também `MUSICWEB_LANGUAGE`.
 
 ### Organização das músicas
 
@@ -375,6 +380,7 @@ musicweb/
 ├── youtube.py          yt-dlp, links diretos e histórico
 ├── lyrics.py           letras (.lrc, tags, LRCLIB)
 ├── web.py              servidor HTTP: rotas da API, streaming e downloads
+├── i18n.py             idioma da interface nas mensagens do servidor (a página tem o próprio dicionário)
 ├── util.py             funções pequenas compartilhadas
 └── static/index.html   a página (HTML, CSS e JS num arquivo só)
 ```

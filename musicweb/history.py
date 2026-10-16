@@ -3,6 +3,7 @@ import time
 
 from . import db
 from .config import cfg
+from .i18n import name
 from .state import albums, item, lock, tracks, yt_items
 
 
@@ -33,7 +34,7 @@ def _entry(tid, title, artist, album):
     with lock:
         t = tracks.get(tid)
         cover = t["album"] if t else (tid if tid in yt_items else None)
-    return {"id": tid, "title": title, "artist": artist, "album": album, "cover": cover,
+    return {"id": tid, "title": title, "artist": name(artist), "album": name(album), "cover": cover,
             "available": t is not None or tid in yt_items}
 
 
@@ -51,6 +52,6 @@ def stats(days=0):
         "enabled": cfg.history_enabled,
         "total": total,
         "top_tracks": [{**_entry(tid, ti, ar, al), "count": n} for tid, n, _, ti, ar, al in top],
-        "top_artists": [{"artist": ar, "count": n} for ar, n in artists],
+        "top_artists": [{"artist": name(ar), "count": n} for ar, n in artists],
         "recent": [{**_entry(tid, ti, ar, al), "at": at} for tid, at, ti, ar, al in recent],
     }

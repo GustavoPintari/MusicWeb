@@ -8,6 +8,9 @@ host = "0.0.0.0"              # "0.0.0.0" = accept connections from other device
 port = 8080
 player_name = "Receiver"      # name of the phone audio output, shown on the page
 
+[interface]
+language = "pt-BR"            # interface language: "pt-BR" (Português) or "en" (English)
+
 [library]
 music_dir = "~/storage/music"
 rescan_every = 60             # seconds between checks for new music (0 disables)

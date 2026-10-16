@@ -3,6 +3,7 @@ import json, os, re, time
 import urllib.error, urllib.parse
 
 from .config import cfg
+from .i18n import _
 from .state import albums, item, yt_items
 from .util import clean_album, http_get, mutagen
 
@@ -99,9 +100,16 @@ def lrclib(artist, title, album="", dur=0):
 
 
 def get_lyrics(tid, artist="", title=""):
+    res = find_lyrics(tid, artist, title)
+    if res.get("src"):                            # e.g. "arquivo .lrc" -> ".lrc file" (also for cached results)
+        res = {**res, "src": _(res["src"])}
+    return res
+
+
+def find_lyrics(tid, artist="", title=""):
     t = item(tid)
     if not t:
-        return {"ok": False, "error": "Faixa não encontrada"}
+        return {"ok": False, "error": _("Faixa não encontrada")}
     yt, manual = tid in yt_items, bool(artist or title)
     cache = os.path.join(cfg.lyrics_dir, tid + ".json")
     if not manual:
@@ -123,15 +131,15 @@ def get_lyrics(tid, artist="", title=""):
     artist, title = (artist or da).strip(), clean_title((title or dt).strip())
     if not cfg.lyrics_online:
         return {"ok": False, "artist": artist, "title": title,
-                "error": "A busca de letras na internet está desligada ([lyrics] online no config.toml)"}
+                "error": _("A busca de letras na internet está desligada ([lyrics] online no config.toml)")}
     try:
         res = lrclib(artist, title, album, t["dur"])
     except Exception as e:
         print("[letra] lrclib:", e, flush=True)
         busy = isinstance(e, urllib.error.HTTPError) and e.code == 429
         return {"ok": False, "artist": artist, "title": title,
-                "error": "O LRCLIB pediu para esperar um pouco. Tente de novo daqui a alguns segundos."
-                if busy else "Não consegui falar com o LRCLIB"}
+                "error": _("O LRCLIB pediu para esperar um pouco. Tente de novo daqui a alguns segundos.")
+                if busy else _("Não consegui falar com o LRCLIB")}
     if not res:
         return {"ok": False, "artist": artist, "title": title}
     os.makedirs(cfg.lyrics_dir, exist_ok=True)
