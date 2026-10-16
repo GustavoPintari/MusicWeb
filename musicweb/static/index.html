@@ -48,12 +48,13 @@ header{position:sticky;top:0;z-index:5;background:var(--bg);padding:12px 0 10px;
 #sheet{position:fixed;inset:0;z-index:10;background:var(--bg);overflow-y:auto;padding:0 16px calc(var(--barh,150px) + 24px);
   transform:translateY(100%);transition:transform .25s ease;visibility:hidden}
 #sheet.open{transform:none;visibility:visible}
-#sheet .top{position:sticky;top:0;background:var(--bg);padding:12px 0;z-index:2;transition:background .45s}
+#sheet .top{position:sticky;top:0;background:transparent;margin:0 -16px;padding:12px 16px;z-index:2;transition:background .3s,box-shadow .3s}
+#sheet.scrolled .top{background:var(--bg);box-shadow:0 4px 14px #0006}
 /* album color: a gradient from the cover's dominant color behind the top of the sheet */
 #sheet::before{content:"";position:absolute;left:0;right:0;top:0;height:560px;pointer-events:none;z-index:0;opacity:0;
   background:linear-gradient(180deg,var(--tint,transparent) 0,var(--tint,transparent) 14%,transparent 100%);transition:opacity .45s}
 #sheet.tinted::before{opacity:1}
-#sheet.tinted .top{background:var(--tint)}
+#sheet.tinted.scrolled .top{background:var(--tint)}
 #sheet>*{position:relative;z-index:1}#sheet>.top{z-index:2}
 .hero{display:flex;gap:16px;align-items:flex-end;flex-wrap:wrap;margin-bottom:14px}
 .hero .cv{width:min(220px,100%);font-size:56px;box-shadow:0 8px 30px #0008}
@@ -119,7 +120,7 @@ a.btn2:active{transform:scale(.92);filter:brightness(1.35)}
 @keyframes eq{0%,100%{height:4px}50%{height:14px}}
 
 /* player */
-#bar{position:fixed;left:0;right:0;bottom:0;z-index:20;background:#0a0a0aee;backdrop-filter:blur(12px);
+#bar{position:fixed;left:0;right:0;bottom:0;z-index:20;background:#0a0a0aee;backdrop-filter:blur(12px);transition:background .6s;
   border-top:1px solid #222;padding:8px 16px calc(10px + env(safe-area-inset-bottom))}
 #pg{display:flex;align-items:center;gap:8px;color:var(--mut);font-size:12px;font-variant-numeric:tabular-nums}
 #pg span{min-width:34px}#pg span:last-child{text-align:right}
@@ -137,6 +138,8 @@ a.btn2:active{transform:scale(.92);filter:brightness(1.35)}
 .ctl button{width:42px;height:42px;padding:0;display:grid;place-items:center;border-radius:50%}
 #pp{background:var(--fg);color:#000;width:48px;height:48px}
 #err{color:var(--err);font-size:12px;margin-top:4px}
+#bar.tinted{background:color-mix(in srgb,var(--btint) 72%,#000c);border-top-color:#fff1}
+#bar.tinted #prog .tr{background:#fff3}
 #volpop{display:none;align-items:center;gap:10px;padding:8px 0 4px}
 #volpop.open{display:flex}
 #volpop input{flex:1;accent-color:var(--ac);height:28px}
@@ -233,7 +236,7 @@ a.btn2:active{transform:scale(.92);filter:brightness(1.35)}
 
 <div id="toast"></div>
 <div id="bar">
-  <div id="outrow"><button id="out"></button><div class="orr"><span id="nowfmt"></span><button id="lyb" title="Letra da música" data-t>🎤 Letra</button></div></div>
+  <div id="outrow"><button id="out"></button><div class="orr"><span id="nowfmt"></span><button id="lyb" title="Letra da música" data-t>Letra</button></div></div>
   <div id="pg"><span id="tc"></span><div id="prog"><div class="tr"><div class="fl"></div></div></div><span id="td"></span></div>
   <div class="pl">
     <div id="now"></div>
@@ -264,16 +267,16 @@ const $=s=>document.querySelector(s);
 const LANG=document.documentElement.lang.toLowerCase().startsWith("en")?"en":"pt-BR",LOC=LANG==="en"?"en-US":"pt-BR";
 const EN={
   "Buscar álbum, artista ou faixa…":"Search albums, artists or tracks…","Álbuns":"Albums","Artistas":"Artists","Tocadas":"Played",
-  "Tocar do YouTube":"Play from YouTube","Reescanear biblioteca":"Rescan library","‹ Voltar":"‹ Back","Letra da música":"Lyrics","🎤 Letra":"🎤 Lyrics",
+  "Tocar do YouTube":"Play from YouTube","Reescanear biblioteca":"Rescan library","‹ Voltar":"‹ Back","Letra da música":"Lyrics",
   "Anterior":"Previous","Tocar/Pausar":"Play/Pause","Próxima":"Next","Volume":"Volume","Parar":"Stop","Diminuir volume":"Volume down","Aumentar volume":"Volume up",
   "Sem conexão com o servidor":"No connection to the server","Erro na página: ":"Page error: ",
   "Nada encontrado":"Nothing found","Nenhuma música encontrada":"No music found","álbum":"album","álbuns":"albums","faixa":"track","faixas":"tracks","{n} faixas":"{n} tracks",
-  "Tocar álbum":"Play album","⬇ Baixar":"⬇ Download","✎ Editar":"✎ Edit","Disco {n}":"Disc {n}",
+  "Tocar álbum":"Play album","Baixar":"Download","Editar":"Edit","Disco {n}":"Disc {n}",
   "Desconhecido":"Unknown","Vários artistas":"Various artists",
-  "Editar álbum":"Edit album","🖼 Enviar imagem":"🖼 Upload image","🔎 Buscar capa":"🔎 Find cover","Buscar":"Search","Nome do álbum":"Album name",
+  "Editar álbum":"Edit album","Enviar imagem":"Upload image","Buscar capa":"Find cover","Buscar":"Search","Nome do álbum":"Album name",
   "Artista do álbum":"Album artist","Ano":"Year","Faixas (nº, título e artista)":"Tracks (no., title and artist)","Número":"Number","Título":"Title",
   "Artista da faixa":"Track artist","Artista":"Artist","As alterações são gravadas nas tags dos arquivos de música.":"Changes are written to the music files' tags.",
-  "Salvar":"Save","Cancelar":"Cancel","🗑 Remover álbum":"🗑 Remove album","Remover":"Remove",
+  "Salvar":"Save","Cancelar":"Cancel","Remover álbum":"Remove album","Remover":"Remove",
   "Os arquivos vão para a lixeira e podem ser recuperados.":"The files go to the trash and can be recovered.",
   "Apagar definitivamente (não dá para desfazer)":"Delete permanently (cannot be undone)",
   "O nome do álbum não pode ficar vazio.":"The album name can't be empty.","Algumas alterações falharam:":"Some changes failed:",
@@ -294,7 +297,7 @@ const EN={
   "\"{name}\" apagado":"\"{name}\" deleted","\"{name}\" movido para a lixeira":"\"{name}\" moved to the trash",
   "Toque em ▶ para começar a tocar aqui":"Tap ▶ to start playing here","Não consegui tocar: ":"Couldn't play: ",
   "Este navegador não conseguiu tocar {what}":"This browser couldn't play {what}","o arquivo":"the file",
-  "📱 Este dispositivo":"📱 This device","Trocar onde a música toca":"Change where the music plays",
+  "Este dispositivo":"This device","Trocar onde a música toca":"Change where the music plays",
   "Tocando neste dispositivo":"Playing on this device","Tocando no {name}":"Playing on {name}",
   "Rádios":"Radio","Buscar rádio pelo nome…":"Search stations by name…","País":"Country","Todos os países":"All countries",
   "Catálogo de rádios: Radio Browser (radio-browser.info)":"Station directory: Radio Browser (radio-browser.info)",
@@ -412,6 +415,12 @@ function setTint(key,a){                    // key: which sheet asked, so a late
   albumTint(a).then(c=>{if(openAlbum!==key)return;sh.style.setProperty("--tint",c);sh.classList.add("tinted");meta.content=c});
 }
 
+function setBarTint(tr){                   // player bar takes the color of the album that is playing
+  const bar=$("#bar"),a=tr&&!tr.radio&&(byId[tr.album]||trackById[tr.id]?.a||{id:tr.album,name:tr.album_name,artist:""});
+  if(!a){bar.classList.remove("tinted");return}
+  albumTint(a).then(c=>{if(S.track?.id!==tr.id)return;bar.style.setProperty("--btint",c);bar.classList.add("tinted")});
+}
+
 let editing=false;
 function renderSheet(){
   if(openAlbum==="@yt"){setTint();return renderYT()}
@@ -426,7 +435,7 @@ function renderSheet(){
       <h1>${esc(a.name)}</h1>
       ${a.full!==a.name?`<div class="full">${esc(a.full)}</div>`:""}
       <div class="meta">${esc(a.artist)}${a.year?" · "+esc(a.year):""} · ${T("{n} faixas",{n:a.tracks.length})}${tot?" · "+fmt(tot):""} ${af.mixed?`<span class="fb">${esc(af.f)}</span>`:fmtBadge(af.f,af.q)}</div>
-      <div class="acts"><button class="big" id="playAll">${PLAY} ${T("Tocar álbum")}</button><a class="btn2" id="dlAlbum" href="/api/download/${a.id}" download>${T("⬇ Baixar")}</a><button id="editAlbum">${T("✎ Editar")}</button></div></div></div>`+
+      <div class="acts"><button class="big" id="playAll">${PLAY} ${T("Tocar álbum")}</button><a class="btn2" id="dlAlbum" href="/api/download/${a.id}" download>${T("Baixar")}</a><button id="editAlbum">${T("Editar")}</button></div></div></div>`+
     a.tracks.map(t=>{const d=discs&&t.disc!==lastDisc?`<div class="disc">${T("Disco {n}",{n:t.disc})}</div>`:"";lastDisc=t.disc;
       return d+`<div class="t" data-t="${t.id}"><span class="n">${t.n||""}</span><span class="ti">${esc(t.title)}${t.artist&&t.artist!==a.artist?`<small>${esc(t.artist)}</small>`:""}</span>${af.mixed?fmtBadge(t.fmt):""}<span class="d">${t.dur?fmt(t.dur):""}</span></div>`}).join("");
   markPlaying();
@@ -434,8 +443,8 @@ function renderSheet(){
 
 function renderEdit(a){
   $("#sheetBody").innerHTML=`<div class="ed"><div class="hero">${cover(a,"",true)}<div class="inf"><h1>${T("Editar álbum")}</h1><div class="meta">${esc(a.full)}</div>
-      <div class="cvacts"><label class="btn">${T("🖼 Enviar imagem")}<input type="file" id="e_file" accept="image/*" hidden></label>
-        <button id="e_find">${T("🔎 Buscar capa")}</button></div></div></div>
+      <div class="cvacts"><label class="btn">${T("Enviar imagem")}<input type="file" id="e_file" accept="image/*" hidden></label>
+        <button id="e_find">${T("Buscar capa")}</button></div></div></div>
     <div id="cs"><form id="csf"><input id="csq" value="${esc((a.artist===T("Desconhecido")||a.artist===T("Vários artistas")?"":a.artist+" ")+a.name)}"><button>${T("Buscar")}</button></form>
       <div id="csr"></div></div>
     <label>${T("Nome do álbum")}</label><input id="e_album" value="${esc(a.full)}">
@@ -447,7 +456,7 @@ function renderEdit(a){
     <p class="note">${T("As alterações são gravadas nas tags dos arquivos de música.")}</p>
     <div class="errs" id="e_err"></div>
     <div class="acts"><button class="big" id="e_save">${T("Salvar")}</button><button id="e_cancel">${T("Cancelar")}</button></div>
-    <div class="danger"><button id="e_del">${T("🗑 Remover álbum")}</button>
+    <div class="danger"><button id="e_del">${T("Remover álbum")}</button>
       <div id="delbox"><p>${T("Remover")} <b>${esc(a.full)}</b> (${a.tracks.length} ${a.tracks.length>1?T("faixas"):T("faixa")})?
         ${T("Os arquivos vão para a lixeira e podem ser recuperados.")}</p>
         <label><input type="checkbox" id="e_perm"> ${T("Apagar definitivamente (não dá para desfazer)")}</label>
@@ -582,7 +591,7 @@ function renderPlays(){
   if(!d.enabled){$("#lib").innerHTML=`<p class="empty">${T("O histórico está desligado ([history] enabled no config.toml).")}</p>`;return}
   const q=$("#q").value.trim().toLowerCase(),f=x=>!q||[x.title,x.artist,x.album].some(v=>v.toLowerCase().includes(q));
   const per=`<div class="per">${[[7,T("7 dias")],[30,T("30 dias")],[0,T("Sempre")]].map(([v,l])=>`<button data-days="${v}" class="${v===P.days?"on":""}">${l}</button>`).join("")}
-    <button class="pa" id="rtb">✨ ${T("Retrospectiva")}</button>
+    <button class="pa" id="rtb">${T("Retrospectiva")}</button>
     <span>${d.total} ${d.total===1?T("reprodução"):T("reproduções")}</span></div>`;
   if(!d.recent.length){$("#lib").innerHTML=per+`<p class="empty">${T("Nada tocado ainda.")}<br>${T("Uma música entra aqui depois de {n} s ouvindo.",{n:playMin})}</p>`;return}
   const top=d.top_tracks.filter(f),rec=d.recent.filter(f);
@@ -692,7 +701,7 @@ function monthLabel(id,capital=true){
 const prevLabel=id=>id.length===4?String(+id-1):monthLabel((([y,m])=>m===1?`${y-1}-12`:`${y}-${String(m-1).padStart(2,"0")}`)(id.split("-").map(Number)),false);
 async function renderRetro(){
   if($("#rtsh"))return drawRetro();
-  $("#sheetBody").innerHTML=`<div id="rtsh"><h1>✨ ${T("Retrospectiva")}</h1>
+  $("#sheetBody").innerHTML=`<div id="rtsh"><h1>${T("Retrospectiva")}</h1>
     <select id="rtsel" aria-label="${T("Período")}"></select><div id="rtbody"><p class="empty">${T("Carregando…")}</p></div></div>`;
   try{RT.periods=await (await fetch("/api/retro")).json()}catch(e){$("#rtbody").innerHTML=`<p class="empty">${T("Sem conexão com o servidor")}</p>`;return}
   const ms=RT.periods.months,ys=RT.periods.years;
@@ -877,6 +886,7 @@ function show(s){
     const a=s.track&&(byId[s.track.album]||trackById[s.track.id]?.a);
     $("#now").innerHTML=s.track?`${cover(a||{id:s.track.album,name:s.track.album_name,artist:""},"",true)}<div class="tx"><b>${esc(s.track.title)}</b><small>${nowSub(s.track)}</small></div>`:`<div class="tx"><small>${T("Nada tocando")}</small></div>`;
     document.title=s.track?`${s.track.title} - MusicWeb`:"MusicWeb";
+    setBarTint(s.track);
     $("#nowfmt").innerHTML=s.track?fmtBadge(s.track.fmt,s.track.q):"";
     if(mode==="local")mediaMeta();
     if(openAlbum==="@ly")renderLyrics();
@@ -989,7 +999,7 @@ const ctl={
 
 function renderOut(){
   const o=$("#out");o.classList.toggle("local",mode==="local");
-  o.innerHTML=mode==="local"?T("📱 Este dispositivo"):`📻 ${esc(playerName)}`;
+  o.innerHTML=mode==="local"?T("Este dispositivo"):esc(playerName);
   o.title=T("Trocar onde a música toca");
 }
 
@@ -1038,12 +1048,13 @@ $("#lib").onclick=e=>{
 };
 function openSheet(id){
   const wasOpen=$("#sheet").classList.contains("open");
-  openAlbum=id;editing=false;renderSheet();$("#sheet").scrollTop=0;$("#sheet").classList.add("open");
+  openAlbum=id;editing=false;renderSheet();$("#sheet").scrollTop=0;$("#sheet").classList.remove("scrolled");$("#sheet").classList.add("open");
   if(!wasOpen)history.pushState({sheet:1},"");
   $("#lyb").classList.toggle("on",id==="@ly");
 }
 function closeSheet(){$("#sheet").classList.remove("open");openAlbum=null;editing=false;$("#lyb").classList.remove("on");setTint()}
 $("#back").onclick=()=>history.back();
+$("#sheet").addEventListener("scroll",e=>e.target.classList.toggle("scrolled",e.target.scrollTop>4),{passive:true});
 window.onpopstate=closeSheet;
 $("#sheetBody").onclick=e=>{
   const x=e.target.closest("[data-x]");if(x){removeYT(x.dataset.x);return}
