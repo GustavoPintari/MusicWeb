@@ -1,10 +1,199 @@
 # MusicWeb
 
+**[English](#english)** · **[Português](#português)**
+
+---
+
+## English
+
+A self-hosted "Spotify" that runs on an Android phone (Termux). The phone stays connected to the receiver/speakers and plays the music with **mpv**; any device on the network controls it from the browser — or plays the music on itself.
+
+It only needs the Python standard library. `mutagen` and `yt-dlp` are optional and unlock extra features.
+
+> The web interface is in Portuguese; button names are shown below with their English meaning.
+
+### Features
+
+- **Library** by albums or artists, with search, format/quality badges (FLAC 24/96, MP3 320k…) and automatic refresh when new music is added.
+- **Two audio outputs**: 📻 *Receiver* (mpv on the phone) or 📱 *Este dispositivo* ("this device", the browser). You can switch mid-song without losing your place.
+- **Covers** from the album folder, the tags or the internet (iTunes / MusicBrainz / Deezer); upload or search for a different one.
+- **Edit tags** (album, artist, year, tracks) and **remove albums** (they go to a trash folder).
+- **Download** a whole album as a `.zip`.
+- 🎤 **Lyrics**: from a `.lrc`/`.txt` file, the tags or [LRCLIB](https://lrclib.net). Synced lyrics highlight the current line and let you jump to it.
+- ▶ **YouTube**: paste a link and play only the audio, on either output.
+
+### Installation (Termux)
+
+```bash
+pkg install git
+git clone https://github.com/GustavoPintari/MusicWeb
+cd MusicWeb
+sh termux/install.sh
+```
+
+`install.sh` installs `python` and `mpv`, installs the `requirements.txt` dependencies, asks for storage access, creates `config.toml` and sets up [start on boot](#start-with-the-phone-termuxboot). It is safe to run again to update; pass `--no-boot` to skip start on boot.
+
+Manual setup:
+
+```bash
+pkg install python mpv
+pip install -r requirements.txt   # mutagen (tags, embedded covers and lyrics) and yt-dlp (YouTube)
+termux-setup-storage              # gives access to ~/storage/music
+```
+
+Requires Python 3.11 or newer (for `config.toml`). The `requirements.txt` dependencies are optional: without them the server runs with fewer features.
+
+### Usage
+
+```bash
+python server.py                       # uses the config / ~/storage/music
+python server.py ~/storage/music --port 8080
+python -m musicweb --config ~/my-config.toml
+```
+
+Then open `http://<phone-ip>:8080` on any device on the same network.
+
+#### In the background
+
+```bash
+termux/start.sh      # starts and restarts automatically if the server crashes
+termux/stop.sh       # stops it (and closes mpv)
+```
+
+The log is at `~/.cache/musicweb/server.log`. `start.sh` also enables `termux-wake-lock` so Android doesn't suspend the server.
+
+### Start with the phone (Termux:Boot)
+
+1. Install the [Termux:Boot](https://wiki.termux.com/wiki/Termux:Boot) app from the same source as Termux (F-Droid or GitHub; builds from different sources don't work together).
+2. Open Termux:Boot once so Android allows it to run at startup.
+3. Run `sh termux/install.sh`. It copies `termux/boot/musicweb.sh` to `~/.termux/boot/` with the project folder already filled in.
+
+To install it manually, copy `termux/boot/musicweb.sh` to `~/.termux/boot/`, set `MUSICWEB_DIR` and run `chmod +x` on it.
+
+On some phones you also need to exclude Termux from battery optimization (Settings → Apps → Termux → Battery → Unrestricted) so it isn't killed.
+
+### Configuration
+
+Copy the example and change what you need — everything is optional:
+
+```bash
+cp config.example.toml config.toml
+```
+
+The file is looked up in this order: `--config`, the `MUSICWEB_CONFIG` variable, `./config.toml`, `~/.config/musicweb/config.toml`.
+
+| Section / key | Default | What it does |
+|---|---|---|
+| `[server] host` | `0.0.0.0` | address the server listens on |
+| `[server] port` | `8080` | port |
+| `[server] player_name` | `Receiver` | name of the phone output shown on the page |
+| `[library] music_dir` | `~/storage/music` | music folder |
+| `[library] rescan_every` | `60` | seconds between checks for new music (0 disables) |
+| `[library] trash_dir` | *(next to the library)* | where removed albums go |
+| `[mpv] audio_output` | `opensles` | mpv audio output (`--ao`) |
+| `[covers] online` | `true` | look up covers online |
+| `[lyrics] online` | `true` | look up lyrics on LRCLIB |
+| `[youtube] cookies` | *(empty)* | `cookies.txt` in case YouTube asks you to sign in |
+| `[youtube] max_history` | `50` | videos kept in "Tocados recentemente" (recently played) |
+| `[youtube] format` | m4a / best audio | format requested from yt-dlp |
+| `[cache] dir` | `~/.cache/musicweb` | covers, lyrics and YouTube history |
+
+**Priority:** defaults < `config.toml` < environment variables < command line.
+The older variables still work: `MPV_AO`, `COVERS_ONLINE`, `LYRICS_ONLINE`, `RESCAN_EVERY`, `PLAYER_NAME`, `YT_COOKIES`, `TRASH`, `MUSIC_DIR`.
+
+### Organizing your music
+
+The server reads the tags when `mutagen` is installed; without it, it uses the folders:
+
+```
+music/
+└── Artist/
+    └── Album/
+        ├── 01 Track.flac
+        ├── 01 Track.lrc        ← lyrics (optional)
+        ├── cover.jpg           ← cover (optional)
+        └── CD2/…               ← extra discs
+```
+
+### Lyrics
+
+When you tap **🎤 Letra** (lyrics), the server looks, in this order, for:
+
+1. a `.lrc` or `.txt` file with the same name as the track;
+2. lyrics stored in the tags (ID3 `USLT`, `LYRICS`, `©lyr`);
+3. LRCLIB, by artist, track name, album and duration.
+
+If the lyrics are wrong (or missing), use **"Buscar outra"** (search again) to fix the artist/title. Lyrics that are found are cached.
+
+### YouTube
+
+Requires `yt-dlp`. The audio goes through the server itself (`/api/stream/yt_<id>`), which renews the YouTube link when it expires — so it works both in mpv and in the browser.
+
+If you see *"o YouTube pediu login para confirmar que não é um robô"* (YouTube asked to sign in to confirm you're not a bot):
+
+1. update yt-dlp: `pip install -U yt-dlp`;
+2. if it keeps happening, export your YouTube cookies ([how to](https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp)) and set `[youtube] cookies = "~/cookies.txt"`.
+
+### Project structure
+
+```
+server.py               shortcut: python server.py
+config.example.toml     configuration template
+requirements.txt        Python dependencies (mutagen, yt-dlp)
+termux/
+├── install.sh          installs packages, dependencies and start on boot
+├── start.sh            starts in the background (with automatic restart)
+├── stop.sh             stops the server
+└── boot/musicweb.sh    Termux:Boot script (goes to ~/.termux/boot/)
+musicweb/
+├── app.py              startup (arguments, configuration, threads)
+├── config.py           reads config.toml / environment
+├── state.py            shared state (library, queue, YouTube history)
+├── library.py          folder scan, album grouping, automatic refresh
+├── covers.py           local, embedded and online covers; cover changes
+├── player.py           mpv control (queue, events, status)
+├── editor.py           tag editing and album removal
+├── youtube.py          yt-dlp, direct links and history
+├── lyrics.py           lyrics (.lrc, tags, LRCLIB)
+├── web.py              HTTP server: API routes, streaming and downloads
+├── util.py             small shared helpers
+└── static/index.html   the page (HTML, CSS and JS in one file)
+```
+
+Module dependencies (no cycles): `config` → `state`/`util` → `youtube` → `covers` → `library` / `player` / `lyrics` → `editor` → `web` → `app`.
+
+### API
+
+| Method | Route | Description |
+|---|---|---|
+| GET | `/api/library` | albums, tracks and YouTube history |
+| GET | `/api/status` | what mpv is playing |
+| GET | `/api/stream/<id>` | track audio (supports Range; `?dl` to download) |
+| GET | `/api/download/<album>` | album as `.zip` |
+| GET | `/api/cover/<album>` | cover |
+| GET | `/api/cover_search?q=` | cover suggestions |
+| GET | `/api/lyrics?id=[&artist=&title=]` | lyrics |
+| POST | `/api/play` `{album}` or `{id, t}` | play on mpv |
+| POST | `/api/pause`, `/resume`, `/stop`, `/next`, `/prev` | controls |
+| POST | `/api/seek` `{t}` · `/api/volume` `{v}` or `{delta}` | position and volume |
+| POST | `/api/rescan` | re-reads the library |
+| POST | `/api/edit` · `/api/delete` | edit tags · remove album |
+| POST | `/api/cover_set` `{album, url}` · `/api/cover_upload?album=` | change cover |
+| POST | `/api/yt` `{url}` · `/api/yt_remove` `{id}` | YouTube |
+
+### License
+
+[MIT](LICENSE)
+
+---
+
+## Português
+
 Um "Spotify" auto-hospedado para rodar no celular (Termux). O celular fica ligado ao receiver/caixa de som e toca as músicas com o **mpv**; qualquer aparelho da rede controla tudo pelo navegador — ou toca a música nele mesmo.
 
 Só usa a biblioteca padrão do Python. `mutagen` e `yt-dlp` são opcionais e liberam recursos extras.
 
-## Recursos
+### Recursos
 
 - **Biblioteca** por álbuns ou artistas, com busca, formato/qualidade (FLAC 24/96, MP3 320k…) e atualização automática quando entram músicas novas.
 - **Duas saídas de áudio**: 📻 *Receiver* (o mpv no celular) ou 📱 *Este dispositivo* (o navegador). Dá para trocar no meio da música sem perder o ponto.
@@ -14,19 +203,28 @@ Só usa a biblioteca padrão do Python. `mutagen` e `yt-dlp` são opcionais e li
 - 🎤 **Letras**: de arquivo `.lrc`/`.txt`, das tags ou do [LRCLIB](https://lrclib.net). Letras sincronizadas destacam a linha atual e permitem pular para ela.
 - ▶ **YouTube**: cole um link e toque só o áudio, em qualquer uma das saídas.
 
-## Instalação (Termux)
+### Instalação (Termux)
+
+```bash
+pkg install git
+git clone https://github.com/GustavoPintari/MusicWeb
+cd MusicWeb
+sh termux/install.sh
+```
+
+O `install.sh` instala o `python` e o `mpv`, instala as dependências do `requirements.txt`, pede acesso ao armazenamento, cria o `config.toml` e configura o [início automático](#iniciar-junto-com-o-celular-termuxboot). Pode rodar de novo para atualizar; use `--no-boot` se não quiser o início automático.
+
+Para fazer à mão:
 
 ```bash
 pkg install python mpv
-pip install mutagen yt-dlp      # opcionais: tags/capas embutidas e YouTube
-termux-setup-storage            # dá acesso a ~/storage/music
-git clone https://github.com/GustavoPintari/MusicWeb
-cd MusicWeb
+pip install -r requirements.txt   # mutagen (tags, capas e letras embutidas) e yt-dlp (YouTube)
+termux-setup-storage              # dá acesso a ~/storage/music
 ```
 
-Python 3.11 ou mais novo (por causa do `config.toml`).
+Requer Python 3.11 ou mais novo, por causa do `config.toml`. As dependências do `requirements.txt` são opcionais: sem elas, o servidor roda com menos recursos.
 
-## Uso
+### Uso
 
 ```bash
 python server.py                       # usa a configuração / ~/storage/music
@@ -36,7 +234,26 @@ python -m musicweb --config ~/meu-config.toml
 
 Depois abra `http://<ip-do-celular>:8080` em qualquer aparelho da mesma rede.
 
-## Configuração
+#### Em segundo plano
+
+```bash
+termux/start.sh      # inicia e reinicia sozinho se o servidor cair
+termux/stop.sh       # para (e encerra o mpv)
+```
+
+O log fica em `~/.cache/musicweb/server.log`. O `start.sh` também ativa o `termux-wake-lock` para o Android não suspender o servidor.
+
+### Iniciar junto com o celular (Termux:Boot)
+
+1. Instale o app [Termux:Boot](https://wiki.termux.com/wiki/Termux:Boot) da mesma loja em que instalou o Termux (F-Droid ou GitHub; versões de lojas diferentes não conversam entre si).
+2. Abra o Termux:Boot uma vez, para o Android liberar a execução na inicialização.
+3. Rode `sh termux/install.sh`. Ele copia `termux/boot/musicweb.sh` para `~/.termux/boot/` já com a pasta do projeto preenchida.
+
+Para instalar à mão, copie `termux/boot/musicweb.sh` para `~/.termux/boot/`, ajuste o `MUSICWEB_DIR` e dê `chmod +x`.
+
+Em alguns aparelhos também é preciso tirar o Termux da otimização de bateria (Configurações → Apps → Termux → Bateria → Sem restrições) para ele não ser encerrado.
+
+### Configuração
 
 Copie o exemplo e ajuste o que quiser — tudo é opcional:
 
@@ -65,7 +282,7 @@ O arquivo é procurado nesta ordem: `--config`, variável `MUSICWEB_CONFIG`, `./
 **Prioridade:** padrão < `config.toml` < variáveis de ambiente < linha de comando.
 As variáveis antigas continuam valendo: `MPV_AO`, `COVERS_ONLINE`, `LYRICS_ONLINE`, `RESCAN_EVERY`, `PLAYER_NAME`, `YT_COOKIES`, `TRASH`, `MUSIC_DIR`.
 
-## Organização das músicas
+### Organização das músicas
 
 O servidor lê as tags quando o `mutagen` está instalado; sem ele, usa as pastas:
 
@@ -79,7 +296,7 @@ music/
         └── CD2/…               ← discos extras
 ```
 
-## Letras
+### Letras
 
 Ao tocar no botão **🎤 Letra**, o servidor procura, nesta ordem:
 
@@ -89,7 +306,7 @@ Ao tocar no botão **🎤 Letra**, o servidor procura, nesta ordem:
 
 Se vier a letra errada (ou nenhuma), use **"Buscar outra"** para corrigir artista/música. As letras encontradas ficam no cache.
 
-## YouTube
+### YouTube
 
 Precisa do `yt-dlp`. O áudio passa pelo próprio servidor (`/api/stream/yt_<id>`), que renova o link do YouTube quando ele expira — assim funciona tanto no mpv quanto no navegador.
 
@@ -98,11 +315,17 @@ Se aparecer *"o YouTube pediu login para confirmar que não é um robô"*:
 1. atualize o yt-dlp: `pip install -U yt-dlp`;
 2. se continuar, exporte os cookies do YouTube ([como fazer](https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp)) e configure `[youtube] cookies = "~/cookies.txt"`.
 
-## Estrutura do projeto
+### Estrutura do projeto
 
 ```
 server.py               atalho: python server.py
 config.example.toml     modelo de configuração
+requirements.txt        dependências Python (mutagen, yt-dlp)
+termux/
+├── install.sh          instala pacotes, dependências e o início automático
+├── start.sh            inicia em segundo plano (com reinício automático)
+├── stop.sh             para o servidor
+└── boot/musicweb.sh    script do Termux:Boot (vai para ~/.termux/boot/)
 musicweb/
 ├── app.py              inicialização (argumentos, configuração, threads)
 ├── config.py           leitura do config.toml / ambiente
@@ -120,7 +343,7 @@ musicweb/
 
 Dependências entre módulos (sem ciclos): `config` → `state`/`util` → `youtube` → `covers` → `library` / `player` / `lyrics` → `editor` → `web` → `app`.
 
-## API
+### API
 
 | Método | Rota | Descrição |
 |---|---|---|
@@ -139,6 +362,6 @@ Dependências entre módulos (sem ciclos): `config` → `state`/`util` → `yout
 | POST | `/api/cover_set` `{album, url}` · `/api/cover_upload?album=` | trocar capa |
 | POST | `/api/yt` `{url}` · `/api/yt_remove` `{id}` | YouTube |
 
-## Licença
+### Licença
 
 [MIT](LICENSE)
