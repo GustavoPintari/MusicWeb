@@ -4,6 +4,7 @@ import itertools, json, os, socket, subprocess, tempfile, threading, time
 from . import db
 from .config import cfg
 from .history import min_listen, record_play
+from .i18n import _, name
 from .state import albums, item, lock, state
 from .youtube import yt_direct
 
@@ -27,7 +28,7 @@ def mpv_start():
         ["mpv", "--idle=yes", "--no-video", "--no-terminal", f"--ao={cfg.mpv_ao}",
          f"--input-ipc-server={MPV_SOCK}"],
         stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    for _ in range(50):
+    for _try in range(50):
         if os.path.exists(MPV_SOCK):
             return
         time.sleep(0.1)
@@ -91,7 +92,7 @@ def mpv_events():
                     if ev.get("event") != "end-file":
                         continue
                     if ev.get("reason") == "error":
-                        state["error"] = "mpv não conseguiu tocar: " + str(ev.get("file_error", "erro"))
+                        state["error"] = _("mpv não conseguiu tocar: {err}", err=ev.get("file_error", _("erro")))
                     if ev.get("reason") in ("eof", "error") and state["active"]:
                         threading.Thread(target=play_pos, args=(state["pos"] + 1,), daemon=True).start()
         except OSError:
@@ -258,5 +259,5 @@ def status():
                 "time": t or 0, "dur": dur or (cur["dur"] if cur else 0), "error": state["error"],
                 "volume": round(vol) if vol is not None else None, "lib": state["lib"],
                 "track": cur and {**{k: cur[k] for k in ("id", "title", "artist", "album", "fmt", "q")},
-                                  "album_name": alb["name"] if alb else "YouTube",
-                                  "album_artist": alb["artist"] if alb else cur["artist"]}}
+                                  "album_name": name(alb["name"]) if alb else "YouTube",
+                                  "album_artist": name(alb["artist"]) if alb else cur["artist"]}}

@@ -10,7 +10,7 @@ A self-hosted "Spotify" that runs on an Android phone (Termux). The phone stays 
 
 It only needs the Python standard library. `mutagen` and `yt-dlp` are optional and unlock extra features.
 
-> The web interface is in Portuguese; button names are shown below with their English meaning.
+> The web interface is in Portuguese by default; set `[interface] language = "en"` in `config.toml` for English. Button names below are the Portuguese ones, with their meaning.
 
 ### Features
 
@@ -23,6 +23,7 @@ It only needs the Python standard library. `mutagen` and `yt-dlp` are optional a
 - ▶ **YouTube**: paste a link and play only the audio, on either output.
 - 📊 **Tocadas** (played) tab: most played tracks and artists (last 7 days, 30 days or all time) and the play history.
 - **Queue survives restarts**: after a reboot or crash, the queue comes back paused where it stopped — press play to continue.
+- **Interface in Portuguese (BR) or English** (`[interface] language`).
 - **Fast startup** on large libraries: tags are read once and cached in SQLite; later scans only read new or changed files.
 
 ### Installation (Termux)
@@ -31,10 +32,10 @@ It only needs the Python standard library. `mutagen` and `yt-dlp` are optional a
 pkg install git
 git clone https://github.com/GustavoPintari/MusicWeb
 cd MusicWeb
-sh termux/install.sh
+./musicweb.sh install
 ```
 
-`install.sh` installs `python` and `mpv`, installs the `requirements.txt` dependencies, asks for storage access, creates `config.toml` and sets up [start on boot](#start-with-the-phone-termuxboot). It is safe to run again to update; pass `--no-boot` to skip start on boot.
+`./musicweb.sh install` installs `python` and `mpv`, installs the `requirements.txt` dependencies, asks for storage access, creates `config.toml` and sets up [start on boot](#start-with-the-phone-termuxboot). It is safe to run again to update; pass `--no-boot` to skip start on boot.
 
 Manual setup:
 
@@ -56,22 +57,24 @@ python -m musicweb --config ~/my-config.toml
 
 Then open `http://<phone-ip>:8080` on any device on the same network.
 
-#### In the background
+#### In the background: `musicweb.sh`
 
 ```bash
-termux/start.sh      # starts and restarts automatically if the server crashes
-termux/stop.sh       # stops it (and closes mpv)
+./musicweb.sh start      # starts in the background and restarts it if it crashes (default with no arguments)
+./musicweb.sh stop       # stops it (and closes mpv)
+./musicweb.sh restart
+./musicweb.sh status     # running or not, config file, music folder, address and what is playing
+./musicweb.sh log        # last lines of the log (log -f: follow it)
+./musicweb.sh boot on    # start with the phone (boot off: don't)
 ```
 
-The log is at `~/.cache/musicweb/server.log`. `start.sh` also enables `termux-wake-lock` so Android doesn't suspend the server.
+The log is at `~/.cache/musicweb/server.log`. `start` also enables `termux-wake-lock` so Android doesn't suspend the server. Stopping or restarting keeps the saved queue: it comes back paused.
 
 ### Start with the phone (Termux:Boot)
 
 1. Install the [Termux:Boot](https://wiki.termux.com/wiki/Termux:Boot) app from the same source as Termux (F-Droid or GitHub; builds from different sources don't work together).
 2. Open Termux:Boot once so Android allows it to run at startup.
-3. Run `sh termux/install.sh`. It copies `termux/boot/musicweb.sh` to `~/.termux/boot/` with the project folder already filled in.
-
-To install it manually, copy `termux/boot/musicweb.sh` to `~/.termux/boot/`, set `MUSICWEB_DIR` and run `chmod +x` on it.
+3. Run `./musicweb.sh boot on` (`install` already does it). It creates `~/.termux/boot/musicweb.sh` as a link to the project's `musicweb.sh`, which Termux:Boot runs with no arguments, i.e. `start`.
 
 On some phones you also need to exclude Termux from battery optimization (Settings → Apps → Termux → Battery → Unrestricted) so it isn't killed.
 
@@ -90,6 +93,7 @@ The file is looked up in this order: `--config`, the `MUSICWEB_CONFIG` variable,
 | `[server] host` | `0.0.0.0` | address the server listens on |
 | `[server] port` | `8080` | port |
 | `[server] player_name` | `Receiver` | name of the phone output shown on the page |
+| `[interface] language` | `pt-BR` | interface language: `pt-BR` (Portuguese) or `en` (English) |
 | `[library] music_dir` | `~/storage/music` | music folder |
 | `[library] rescan_every` | `60` | seconds between checks for new music (0 disables) |
 | `[library] trash_dir` | *(next to the library)* | where removed albums go |
@@ -106,7 +110,7 @@ The file is looked up in this order: `--config`, the `MUSICWEB_CONFIG` variable,
 | `[data] dir` | `~/.local/share/musicweb` | `musicweb.db`: scan cache, play history and saved queue |
 
 **Priority:** defaults < `config.toml` < environment variables < command line.
-The older variables still work: `MPV_AO`, `COVERS_ONLINE`, `LYRICS_ONLINE`, `RESCAN_EVERY`, `PLAYER_NAME`, `YT_COOKIES`, `TRASH`, `MUSIC_DIR`.
+The older variables still work: `MPV_AO`, `COVERS_ONLINE`, `LYRICS_ONLINE`, `RESCAN_EVERY`, `PLAYER_NAME`, `YT_COOKIES`, `TRASH`, `MUSIC_DIR`; plus `MUSICWEB_LANGUAGE`.
 
 ### Organizing your music
 
@@ -157,13 +161,10 @@ SQLite comes with Python, so there is nothing extra to install. To back up your 
 server.py               shortcut: python server.py
 config.example.toml     configuration template
 requirements.txt        Python dependencies (mutagen, yt-dlp)
-termux/
-├── install.sh          installs packages, dependencies and start on boot
-├── start.sh            starts in the background (with automatic restart)
-├── stop.sh             stops the server
-└── boot/musicweb.sh    Termux:Boot script (goes to ~/.termux/boot/)
+musicweb.sh             Termux control: start, stop, restart, status, log, install, boot on/off
 musicweb/
 ├── app.py              startup (arguments, configuration, threads)
+├── info.py             `musicweb.sh status` details
 ├── config.py           reads config.toml / environment
 ├── state.py            shared state (library, queue, YouTube history)
 ├── db.py               SQLite: schema, scan cache, key/value storage
@@ -175,6 +176,7 @@ musicweb/
 ├── youtube.py          yt-dlp, direct links and history
 ├── lyrics.py           lyrics (.lrc, tags, LRCLIB)
 ├── web.py              HTTP server: API routes, streaming and downloads
+├── i18n.py             interface language for server messages (the page has its own dictionary)
 ├── util.py             small shared helpers
 └── static/index.html   the page (HTML, CSS and JS in one file)
 ```
@@ -225,6 +227,7 @@ Só usa a biblioteca padrão do Python. `mutagen` e `yt-dlp` são opcionais e li
 - ▶ **YouTube**: cole um link e toque só o áudio, em qualquer uma das saídas.
 - 📊 Aba **Tocadas**: músicas e artistas mais ouvidos (últimos 7 dias, 30 dias ou sempre) e o histórico de reprodução.
 - **Fila que sobrevive a reinício**: depois de religar o celular ou de uma queda, a fila volta pausada onde parou — é só apertar play.
+- **Interface em português (BR) ou inglês** (`[interface] language`).
 - **Inicialização rápida** em bibliotecas grandes: as tags são lidas uma vez e guardadas no SQLite; as varreduras seguintes só leem arquivos novos ou alterados.
 
 ### Instalação (Termux)
@@ -233,10 +236,10 @@ Só usa a biblioteca padrão do Python. `mutagen` e `yt-dlp` são opcionais e li
 pkg install git
 git clone https://github.com/GustavoPintari/MusicWeb
 cd MusicWeb
-sh termux/install.sh
+./musicweb.sh install
 ```
 
-O `install.sh` instala o `python` e o `mpv`, instala as dependências do `requirements.txt`, pede acesso ao armazenamento, cria o `config.toml` e configura o [início automático](#iniciar-junto-com-o-celular-termuxboot). Pode rodar de novo para atualizar; use `--no-boot` se não quiser o início automático.
+O `./musicweb.sh install` instala o `python` e o `mpv`, instala as dependências do `requirements.txt`, pede acesso ao armazenamento, cria o `config.toml` e configura o [início automático](#iniciar-junto-com-o-celular-termuxboot). Pode rodar de novo para atualizar; use `--no-boot` se não quiser o início automático.
 
 Para fazer à mão:
 
@@ -258,22 +261,24 @@ python -m musicweb --config ~/meu-config.toml
 
 Depois abra `http://<ip-do-celular>:8080` em qualquer aparelho da mesma rede.
 
-#### Em segundo plano
+#### Em segundo plano: `musicweb.sh`
 
 ```bash
-termux/start.sh      # inicia e reinicia sozinho se o servidor cair
-termux/stop.sh       # para (e encerra o mpv)
+./musicweb.sh start      # inicia em segundo plano e reinicia sozinho se cair (padrão sem argumentos)
+./musicweb.sh stop       # para (e encerra o mpv)
+./musicweb.sh restart
+./musicweb.sh status     # se está rodando, arquivo de config, pasta de músicas, endereço e o que está tocando
+./musicweb.sh log        # últimas linhas do log (log -f: acompanha)
+./musicweb.sh boot on    # inicia junto com o celular (boot off: não inicia)
 ```
 
-O log fica em `~/.cache/musicweb/server.log`. O `start.sh` também ativa o `termux-wake-lock` para o Android não suspender o servidor.
+O log fica em `~/.cache/musicweb/server.log`. O `start` também ativa o `termux-wake-lock` para o Android não suspender o servidor. Parar ou reiniciar mantém a fila salva: ela volta pausada.
 
 ### Iniciar junto com o celular (Termux:Boot)
 
 1. Instale o app [Termux:Boot](https://wiki.termux.com/wiki/Termux:Boot) da mesma loja em que instalou o Termux (F-Droid ou GitHub; versões de lojas diferentes não conversam entre si).
 2. Abra o Termux:Boot uma vez, para o Android liberar a execução na inicialização.
-3. Rode `sh termux/install.sh`. Ele copia `termux/boot/musicweb.sh` para `~/.termux/boot/` já com a pasta do projeto preenchida.
-
-Para instalar à mão, copie `termux/boot/musicweb.sh` para `~/.termux/boot/`, ajuste o `MUSICWEB_DIR` e dê `chmod +x`.
+3. Rode `./musicweb.sh boot on` (o `install` já faz isso). Ele cria `~/.termux/boot/musicweb.sh` como um link para o `musicweb.sh` do projeto, que o Termux:Boot executa sem argumentos, ou seja, `start`.
 
 Em alguns aparelhos também é preciso tirar o Termux da otimização de bateria (Configurações → Apps → Termux → Bateria → Sem restrições) para ele não ser encerrado.
 
@@ -292,6 +297,7 @@ O arquivo é procurado nesta ordem: `--config`, variável `MUSICWEB_CONFIG`, `./
 | `[server] host` | `0.0.0.0` | endereço em que o servidor escuta |
 | `[server] port` | `8080` | porta |
 | `[server] player_name` | `Receiver` | nome da saída do celular na página |
+| `[interface] language` | `pt-BR` | idioma da interface: `pt-BR` (português) ou `en` (inglês) |
 | `[library] music_dir` | `~/storage/music` | pasta das músicas |
 | `[library] rescan_every` | `60` | segundos entre buscas por músicas novas (0 desliga) |
 | `[library] trash_dir` | *(ao lado da biblioteca)* | para onde vão os álbuns removidos |
@@ -308,7 +314,7 @@ O arquivo é procurado nesta ordem: `--config`, variável `MUSICWEB_CONFIG`, `./
 | `[data] dir` | `~/.local/share/musicweb` | `musicweb.db`: cache da varredura, histórico e fila salva |
 
 **Prioridade:** padrão < `config.toml` < variáveis de ambiente < linha de comando.
-As variáveis antigas continuam valendo: `MPV_AO`, `COVERS_ONLINE`, `LYRICS_ONLINE`, `RESCAN_EVERY`, `PLAYER_NAME`, `YT_COOKIES`, `TRASH`, `MUSIC_DIR`.
+As variáveis antigas continuam valendo: `MPV_AO`, `COVERS_ONLINE`, `LYRICS_ONLINE`, `RESCAN_EVERY`, `PLAYER_NAME`, `YT_COOKIES`, `TRASH`, `MUSIC_DIR`; e também `MUSICWEB_LANGUAGE`.
 
 ### Organização das músicas
 
@@ -359,13 +365,10 @@ O SQLite já vem com o Python, então não há nada extra para instalar. Para fa
 server.py               atalho: python server.py
 config.example.toml     modelo de configuração
 requirements.txt        dependências Python (mutagen, yt-dlp)
-termux/
-├── install.sh          instala pacotes, dependências e o início automático
-├── start.sh            inicia em segundo plano (com reinício automático)
-├── stop.sh             para o servidor
-└── boot/musicweb.sh    script do Termux:Boot (vai para ~/.termux/boot/)
+musicweb.sh             controle no Termux: start, stop, restart, status, log, install, boot on/off
 musicweb/
 ├── app.py              inicialização (argumentos, configuração, threads)
+├── info.py             detalhes do `musicweb.sh status`
 ├── config.py           leitura do config.toml / ambiente
 ├── state.py            estado compartilhado (biblioteca, fila, histórico do YouTube)
 ├── db.py               SQLite: esquema, cache da varredura, chave/valor
@@ -377,6 +380,7 @@ musicweb/
 ├── youtube.py          yt-dlp, links diretos e histórico
 ├── lyrics.py           letras (.lrc, tags, LRCLIB)
 ├── web.py              servidor HTTP: rotas da API, streaming e downloads
+├── i18n.py             idioma da interface nas mensagens do servidor (a página tem o próprio dicionário)
 ├── util.py             funções pequenas compartilhadas
 └── static/index.html   a página (HTML, CSS e JS num arquivo só)
 ```

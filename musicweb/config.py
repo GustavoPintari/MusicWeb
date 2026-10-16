@@ -14,6 +14,7 @@ FILE_KEYS = {
     ("server", "host"): ("host", str),
     ("server", "port"): ("port", int),
     ("server", "player_name"): ("player_name", str),
+    ("interface", "language"): ("language", str),
     ("library", "music_dir"): ("music_dir", str),
     ("library", "rescan_every"): ("rescan_every", int),
     ("library", "trash_dir"): ("trash_dir", str),
@@ -40,7 +41,12 @@ ENV_KEYS = {
     "YT_COOKIES": ("yt_cookies", str),
     "TRASH": ("trash_dir", str),
     "MUSIC_DIR": ("music_dir", str),
+    "MUSICWEB_LANGUAGE": ("language", str),
 }
+
+# accepted spellings for [interface] language
+LANGUAGES = {"pt-br": "pt-BR", "pt_br": "pt-BR", "pt": "pt-BR", "portugues": "pt-BR", "português": "pt-BR",
+             "en": "en", "en-us": "en", "en_us": "en", "en-gb": "en", "english": "en", "ingles": "en", "inglês": "en"}
 
 
 def _conv(kind, v):
@@ -54,6 +60,7 @@ class Config:
     host: str = "0.0.0.0"
     port: int = 8080
     player_name: str = "Receiver"            # name of the phone audio output, shown on the page
+    language: str = "pt-BR"                  # interface language: "pt-BR" or "en"
     music_dir: str = "~/storage/music"
     rescan_every: int = 60                   # seconds between checks for new music; 0 disables
     trash_dir: str = ""                      # empty = .musicweb-lixeira folder next to the library
@@ -70,7 +77,12 @@ class Config:
     resume_on_start: bool = False            # start playing the saved queue right away after a restart
     source: str = ""                         # which file the configuration came from
 
-    # ---- derived paths
+    # ---- derived values
+    @property
+    def lang(self):
+        """Normalized interface language: "pt-BR" or "en"."""
+        return LANGUAGES.get(self.language.strip().lower(), "pt-BR")
+
     @property
     def root(self):
         return os.path.abspath(os.path.expanduser(self.music_dir))
@@ -114,6 +126,9 @@ class Config:
         for env, (attr, kind) in ENV_KEYS.items():
             if os.environ.get(env) is not None:
                 setattr(self, attr, _conv(kind, os.environ[env]))
+        if self.language.strip().lower() not in LANGUAGES:
+            print(f"[config] idioma desconhecido em [interface] language: {self.language!r} (use \"pt-BR\" ou \"en\"); usando pt-BR")
+            self.language = "pt-BR"
         return self
 
     @staticmethod

@@ -6,6 +6,7 @@ from .config import cfg
 from .covers import cover_candidates, cover_from_url, get_cover, set_cover
 from .editor import edit_album, remove_album
 from .history import record_play, stats
+from .i18n import _
 from .library import library_json, scan
 from .lyrics import get_lyrics
 from .player import mpv_cmd, pause, play_pos, resume, seek, status, stop
@@ -50,11 +51,13 @@ class H(BaseHTTPRequestHandler):
         self.wfile.write(b)
 
     def do_GET(self):
-        p, _, qs = self.path.partition("?")
+        p, _sep, qs = self.path.partition("?")
         q = urllib.parse.parse_qs(qs)
         if p == "/":
             with open(os.path.join(STATIC, "index.html"), "rb") as fh:
-                self.send(fh.read(), "text/html; charset=utf-8")
+                page = fh.read()
+            # the page reads the interface language from <html lang>
+            self.send(page.replace(b'<html lang="pt-BR">', f'<html lang="{cfg.lang}">'.encode(), 1), "text/html; charset=utf-8")
         elif p == "/api/library":
             self.send(library_json())
         elif p == "/api/status":
@@ -134,7 +137,7 @@ class H(BaseHTTPRequestHandler):
         r = None
         for attempt in range(2):                     # 2nd attempt asks for a new link (the old one expired)
             try:
-                url, headers, _ = yt_direct(tid, force=attempt > 0)
+                url, headers, _fetched = yt_direct(tid, force=attempt > 0)
             except Exception as e:
                 return self.send(json.dumps({"error": str(e)}), code=502)
             h = dict(headers)
@@ -204,10 +207,10 @@ class H(BaseHTTPRequestHandler):
 
     def do_POST(self):
         n = int(self.headers.get("Content-Length") or 0)
-        p, _, qs = self.path.partition("?")
+        p, _sep, qs = self.path.partition("?")
         if p == "/api/cover_upload":                 # body = the image itself
             if n > MAX_UPLOAD:
-                return self.send('{"ok":false,"error":"imagem grande demais"}', code=413)
+                return self.send(json.dumps({"ok": False, "error": _("imagem grande demais")}), code=413)
             data = self.rfile.read(n)
             try:
                 set_cover(urllib.parse.parse_qs(qs).get("album", [""])[0], data)
@@ -229,7 +232,7 @@ class H(BaseHTTPRequestHandler):
                 elif body.get("id") in yt_items:
                     queue, pos = [body["id"]], 0
                 else:
-                    return self.send('{"error":"não encontrado"}', code=404)
+                    return self.send(json.dumps({"error": _("não encontrado")}), code=404)
                 state["queue"] = list(queue)
             play_pos(pos, float(body.get("t") or 0))
         elif p == "/api/pause":

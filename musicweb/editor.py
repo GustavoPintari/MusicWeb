@@ -3,6 +3,7 @@ import os, shutil, time
 
 from .config import cfg
 from .covers import cover_ver
+from .i18n import _
 from .library import scan
 from .player import mpv_cmd
 from .state import albums, lock, state, tracks
@@ -16,7 +17,7 @@ EDITABLE_TRACK = ("title", "artist", "tracknumber")
 def write_tags(path, fields):
     f = mutagen.File(path, easy=True)
     if f is None:
-        raise ValueError("formato não suportado")
+        raise ValueError(_("formato não suportado"))
     if f.tags is None:
         f.add_tags()
     for k, v in fields.items():
@@ -30,11 +31,11 @@ def write_tags(path, fields):
 
 def edit_album(body):
     if not mutagen:
-        return {"ok": False, "errors": ["Instale o mutagen para editar tags: pip install mutagen"]}
+        return {"ok": False, "errors": [_("Instale o mutagen para editar tags: pip install mutagen")]}
     with lock:
         a = albums.get(body.get("album"))
         if not a:
-            return {"ok": False, "errors": ["Álbum não encontrado (a biblioteca mudou?)"]}
+            return {"ok": False, "errors": [_("Álbum não encontrado (a biblioteca mudou?)")]}
         tids = list(a["tracks"])
         paths = {t: tracks[t]["path"] for t in tids}
     album_fields = {k: v for k, v in (body.get("fields") or {}).items() if k in EDITABLE_ALBUM}
@@ -62,7 +63,7 @@ def remove_album(aid, permanent=False):
     with lock:
         a = albums.get(aid)
         if not a:
-            return {"ok": False, "errors": ["Álbum não encontrado"]}
+            return {"ok": False, "errors": [_("Álbum não encontrado")]}
         tids = list(a["tracks"])
         paths = [tracks[t]["path"] for t in tids]
         playing = state["active"] and state["queue"] and state["queue"][state["pos"]] in tids
@@ -77,7 +78,7 @@ def remove_album(aid, permanent=False):
     other_audio = False
     if own_dir:
         mine = {os.path.realpath(p) for p in paths}
-        for dp, _, fs in os.walk(adir):
+        for dp, _dirs, fs in os.walk(adir):
             if any(os.path.splitext(f)[1].lower() in EXTS and os.path.realpath(os.path.join(dp, f)) not in mine for f in fs):
                 other_audio = True
                 break
@@ -96,7 +97,7 @@ def remove_album(aid, permanent=False):
         os.makedirs(dest, exist_ok=True)
     for p in targets:
         if not inside_root(p):
-            errors.append(f"{p}: fora da biblioteca, ignorado")
+            errors.append(_("{path}: fora da biblioteca, ignorado", path=p))
             continue
         try:
             if permanent:
