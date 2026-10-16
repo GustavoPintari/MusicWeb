@@ -1,0 +1,10 @@
+# Dependências Python do musicweb (as duas são opcionais; sem elas o servidor funciona com menos recursos).
+# Instalar: pip install -r requirements.txt
+# O mpv não vem do pip: no Termux, pkg install mpv
+
+# Tags (álbum, artista, faixa, ano, duração), capas e letras embutidas; edição de tags pela página
+mutagen>=1.45
+
+# Tocar o áudio de links do YouTube. Sem versão máxima de propósito: o YouTube muda com frequência
+# e só a versão mais nova do yt-dlp costuma funcionar (pip install -U yt-dlp)
+yt-dlp
