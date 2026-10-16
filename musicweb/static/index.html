@@ -6,7 +6,7 @@
 <style>
 :root{--bg:#121212;--card:#1c1c1c;--card2:#262626;--fg:#f2f2f2;--mut:#9a9a9a;--ac:#5aa9e6;--err:#ff6b6b}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.35 system-ui,-apple-system,sans-serif;padding:0 16px 150px}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.35 system-ui,-apple-system,sans-serif;padding:0 16px calc(var(--barh,150px) + 24px)}
 button{font:inherit;color:inherit;background:var(--card2);border:0;border-radius:10px;padding:9px 12px;cursor:pointer;
   transition:transform .08s ease,background .15s ease,filter .15s ease;user-select:none}
 button:active,.press:active{transform:scale(.92);filter:brightness(1.35)}
@@ -45,7 +45,7 @@ header{position:sticky;top:0;z-index:5;background:var(--bg);padding:12px 0 10px;
 .ar.open .row{display:flex}.ar .row .al{flex:0 0 120px;scroll-snap-align:start}
 
 /* open album */
-#sheet{position:fixed;inset:0;z-index:10;background:var(--bg);overflow-y:auto;padding:0 16px 150px;
+#sheet{position:fixed;inset:0;z-index:10;background:var(--bg);overflow-y:auto;padding:0 16px calc(var(--barh,150px) + 24px);
   transform:translateY(100%);transition:transform .25s ease;visibility:hidden}
 #sheet.open{transform:none;visibility:visible}
 #sheet .top{position:sticky;top:0;background:var(--bg);padding:12px 0;z-index:2;transition:background .45s}
@@ -91,7 +91,7 @@ label.btn:active{transform:scale(.92);filter:brightness(1.35)}
 #delbox label{display:flex;gap:8px;align-items:center;color:var(--fg);font-size:14px;margin:0 0 12px}
 #delbox input{width:auto}
 .redbtn{background:var(--err);color:#200;font-weight:700}
-#toast{position:fixed;left:50%;bottom:170px;transform:translate(-50%,20px);opacity:0;background:#333;color:var(--fg);
+#toast{position:fixed;left:50%;bottom:calc(var(--barh,150px) + 20px);transform:translate(-50%,20px);opacity:0;background:#333;color:var(--fg);
   padding:10px 16px;border-radius:10px;z-index:30;transition:.25s;pointer-events:none;max-width:90vw;font-size:14px}
 #toast.show{opacity:1;transform:translate(-50%,0)}
 #outrow{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:2px}
@@ -872,7 +872,7 @@ function markPlaying(){
 function show(s){
   const prevId=S.track?.id,prevLive=S.track?.live;S=s;recvAt=performance.now();
   $("#pp").innerHTML=s.state==="playing"?PAUSE:PLAY;
-  $("#err").textContent=s.error||"";
+  if($("#err").textContent!==(s.error||"")){$("#err").textContent=s.error||"";fitBar()}
   if(s.track?.id!==prevId){
     const a=s.track&&(byId[s.track.album]||trackById[s.track.id]?.a);
     $("#now").innerHTML=s.track?`${cover(a||{id:s.track.album,name:s.track.album_name,artist:""},"",true)}<div class="tx"><b>${esc(s.track.title)}</b><small>${nowSub(s.track)}</small></div>`:`<div class="tx"><small>${T("Nada tocando")}</small></div>`;
@@ -1019,6 +1019,12 @@ async function switchOutput(){
 }
 $("#out").onclick=switchOutput;
 
+// the player bar changes height (volume slider, error line, screen width): keep the page's
+// bottom padding equal to it, so the last tracks can always be scrolled out from under it
+function fitBar(){document.documentElement.style.setProperty("--barh",$("#bar").offsetHeight+"px")}
+if("ResizeObserver" in window)new ResizeObserver(fitBar).observe($("#bar"));
+fitBar();addEventListener("resize",fitBar);
+
 // events
 document.querySelector(".seg").onclick=e=>{const b=e.target.closest("button");if(!b)return;view=b.dataset.v;try{localStorage.setItem("view",view)}catch(e){};if(view==="plays")P.data=null;render()};
 $("#q").oninput=render;
@@ -1086,7 +1092,7 @@ $("#prog").onclick=e=>{if(!S.dur||!S.track)return;const r=e.currentTarget.getBou
   ctl.seek(t)};
 
 let volDragging=false,volTimer=null;
-$("#vol").onclick=e=>{navigator.vibrate?.(10);$("#volpop").classList.toggle("open");e.currentTarget.classList.toggle("on")};
+$("#vol").onclick=e=>{navigator.vibrate?.(10);$("#volpop").classList.toggle("open");e.currentTarget.classList.toggle("on");fitBar()};
 $("#vr").oninput=e=>{volDragging=true;const v=+e.target.value;$("#vl").textContent=v+"%";
   clearTimeout(volTimer);volTimer=setTimeout(()=>ctl.volume(v).finally(()=>volDragging=false),120)};
 $("#vdn").onclick=e=>ctl.volDelta(-5,e.currentTarget);
