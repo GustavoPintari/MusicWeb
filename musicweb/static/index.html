@@ -2,7 +2,7 @@
 <html lang="pt-BR"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#121212">
-<title>Música</title>
+<title>MusicWeb</title>
 <style>
 :root{--bg:#121212;--card:#1c1c1c;--card2:#262626;--fg:#f2f2f2;--mut:#9a9a9a;--ac:#5aa9e6;--err:#ff6b6b}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -224,7 +224,7 @@ const $=s=>document.querySelector(s);
 // Portuguese text is the key; EN maps it to English. T("{n} faixas",{n:3}) fills placeholders.
 const LANG=document.documentElement.lang.toLowerCase().startsWith("en")?"en":"pt-BR",LOC=LANG==="en"?"en-US":"pt-BR";
 const EN={
-  "Música":"Music","Buscar álbum, artista ou faixa…":"Search albums, artists or tracks…","Álbuns":"Albums","Artistas":"Artists","Tocadas":"Played",
+  "Buscar álbum, artista ou faixa…":"Search albums, artists or tracks…","Álbuns":"Albums","Artistas":"Artists","Tocadas":"Played",
   "Tocar do YouTube":"Play from YouTube","Reescanear biblioteca":"Rescan library","‹ Voltar":"‹ Back","Letra da música":"Lyrics","🎤 Letra":"🎤 Lyrics",
   "Anterior":"Previous","Tocar/Pausar":"Play/Pause","Próxima":"Next","Volume":"Volume","Parar":"Stop","Diminuir volume":"Volume down","Aumentar volume":"Volume up",
   "Sem conexão com o servidor":"No connection to the server","Erro na página: ":"Page error: ",
@@ -261,7 +261,7 @@ const EN={
 };
 const T=(s,v)=>{let r=LANG==="en"&&EN[s]||s;if(v)for(const k in v)r=r.split(`{${k}}`).join(v[k]);return r};
 function i18nStatic(){                      // texts written directly in the HTML above
-  document.documentElement.lang=LANG;document.title=T(document.title);
+  document.documentElement.lang=LANG;
   if(LANG!=="en")return;
   document.querySelectorAll("[data-t]").forEach(e=>e.textContent=T(e.textContent));
   document.querySelectorAll("[title]").forEach(e=>e.title=T(e.title));
@@ -596,7 +596,7 @@ function show(s){
   if(s.track?.id!==prevId){
     const a=s.track&&(byId[s.track.album]||trackById[s.track.id]?.a);
     $("#now").innerHTML=s.track?`${cover(a||{id:s.track.album,name:s.track.album_name,artist:""},"",true)}<div class="tx"><b>${esc(s.track.title)}</b><small>${esc(s.track.artist||s.track.album_artist)} — ${esc(s.track.album_name)}</small></div>`:`<div class="tx"><small>${T("Nada tocando")}</small></div>`;
-    document.title=s.track?`${s.track.title} — ${T("Música")}`:T("Música");
+    document.title=s.track?`${s.track.title} - MusicWeb`:"MusicWeb";
     $("#nowfmt").innerHTML=s.track?fmtBadge(s.track.fmt,s.track.q):"";
     if(mode==="local")mediaMeta();
     if(openAlbum==="@ly")renderLyrics();
