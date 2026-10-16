@@ -1,5 +1,5 @@
 """Lyrics: .lrc/.txt file, the track tags or LRCLIB (lrclib.net)."""
-import json, os, re, time
+import json, os, re, socket, time
 import urllib.error, urllib.parse
 
 from .config import cfg
@@ -58,15 +58,20 @@ def lyrics_local(t):
     return None
 
 
+LRCLIB_TIMEOUT = 20     # /api/get looks the song up in other sources the first time, which can take a while
+
+
 def lrclib_get(url):
-    """GET on LRCLIB; if it asks us to wait (429), waits and tries once more."""
+    """GET on LRCLIB; tries once more if it asks us to wait (429) or doesn't answer in time."""
     try:
-        return http_get(url, True)
+        return http_get(url, True, timeout=LRCLIB_TIMEOUT)
     except urllib.error.HTTPError as e:
         if e.code != 429:
             raise
         time.sleep(min(3.0, float(e.headers.get("Retry-After") or 1)))
-        return http_get(url, True)
+    except (socket.timeout, TimeoutError, urllib.error.URLError):
+        time.sleep(1)
+    return http_get(url, True, timeout=LRCLIB_TIMEOUT)
 
 
 def lrclib(artist, title, album="", dur=0):
@@ -89,6 +94,8 @@ def lrclib(artist, title, album="", dur=0):
         except urllib.error.HTTPError as e:
             if e.code not in (400, 404, 429):       # no exact match: fall back to search
                 raise
+        except (socket.timeout, TimeoutError, urllib.error.URLError) as e:
+            print("[letra] lrclib get:", e, "- tentando a busca", flush=True)   # slow exact lookup: try search
     searches = ([{"track_name": title, "artist_name": artist}] if artist else []) + [{"q": f"{artist} {title}".strip()}]
     for p in searches:
         cands = [r for r in lrclib_get(base + "search?" + urllib.parse.urlencode(p)) if has(r)]

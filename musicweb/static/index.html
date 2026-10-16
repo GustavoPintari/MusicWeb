@@ -52,9 +52,9 @@ header{position:sticky;top:0;z-index:5;background:var(--bg);padding:12px 0 10px;
 #sheet.scrolled .top{background:var(--bg);box-shadow:0 4px 14px #0006}
 /* album color: a gradient from the cover's dominant color behind the top of the sheet */
 #sheet::before{content:"";position:absolute;left:0;right:0;top:0;height:560px;pointer-events:none;z-index:0;opacity:0;
-  background:linear-gradient(180deg,var(--tint,transparent) 0,var(--tint,transparent) 14%,transparent 100%);transition:opacity .45s}
+  background:linear-gradient(180deg,transparent 30%,var(--bg) 100%),linear-gradient(105deg,var(--tint,transparent) 25%,var(--tint2,var(--tint,transparent)));transition:opacity .45s}
 #sheet.tinted::before{opacity:1}
-#sheet.tinted.scrolled .top{background:var(--tint)}
+#sheet.tinted.scrolled .top{background:linear-gradient(105deg,var(--tint) 25%,var(--tint2))}
 #sheet>*{position:relative;z-index:1}#sheet>.top{z-index:2}
 .hero{display:flex;gap:16px;align-items:flex-end;flex-wrap:wrap;margin-bottom:14px}
 .hero .cv{width:min(220px,100%);font-size:56px;box-shadow:0 8px 30px #0008}
@@ -97,9 +97,9 @@ label.btn:active{transform:scale(.92);filter:brightness(1.35)}
 #toast.show{opacity:1;transform:translate(-50%,0)}
 #outrow{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:2px}
 #out{font-size:12px;padding:5px 10px;border-radius:14px;background:var(--card);color:var(--mut);display:inline-flex;gap:6px;align-items:center}
-#out.local{color:var(--ac);background:#16283a}
+#out.local{color:var(--ac);background:color-mix(in srgb,var(--ac) 20%,#121212)}
 .fb{font-size:10px;font-weight:700;letter-spacing:.04em;padding:2px 5px;border-radius:4px;background:var(--card2);color:var(--mut);white-space:nowrap}
-.fb.hq{color:var(--ac);background:#16283a}
+.fb.hq{color:var(--ac);background:color-mix(in srgb,var(--ac) 20%,#121212)}
 .cv .fb{position:absolute;top:6px;right:6px;z-index:1;background:#000a;color:#fff}
 .cv .fb.hq{background:#0d2238dd;color:#9cd0ff}
 a.btn2{background:var(--card2);color:var(--fg);border-radius:10px;padding:9px 12px;text-decoration:none;display:inline-flex;align-items:center;gap:6px;
@@ -138,7 +138,7 @@ a.btn2:active{transform:scale(.92);filter:brightness(1.35)}
 .ctl button{width:42px;height:42px;padding:0;display:grid;place-items:center;border-radius:50%}
 #pp{background:var(--fg);color:#000;width:48px;height:48px}
 #err{color:var(--err);font-size:12px;margin-top:4px}
-#bar.tinted{background:color-mix(in srgb,var(--btint) 72%,#000c);border-top-color:#fff1}
+#bar.tinted{background:linear-gradient(105deg,color-mix(in srgb,var(--btint) 75%,#000c) 30%,color-mix(in srgb,var(--btint2) 75%,#000c));border-top-color:#fff1}
 #bar.tinted #prog .tr{background:#fff3}
 #volpop{display:none;align-items:center;gap:10px;padding:8px 0 4px}
 #volpop.open{display:flex}
@@ -150,7 +150,7 @@ a.btn2:active{transform:scale(.92);filter:brightness(1.35)}
 /* lyrics */
 .orr{display:flex;align-items:center;gap:8px}
 #lyb{font-size:12px;padding:5px 10px;border-radius:14px;background:var(--card);color:var(--mut)}
-#lyb.on{color:var(--ac);background:#16283a}
+#lyb.on{color:var(--ac);background:color-mix(in srgb,var(--ac) 20%,#121212)}
 .lyh{display:flex;gap:12px;align-items:center;margin:4px 0 18px}
 .lyh .cv{width:64px;flex:none;font-size:22px;border-radius:6px}
 .lyh div:last-child{min-width:0}.lyh b,.lyh small{display:block;overflow:hidden;text-overflow:ellipsis}
@@ -377,48 +377,67 @@ function render(){
   }
 }
 
-// ---------- album color: dominant color of the cover, darkened to sit behind white text
+// ---------- album colors from the cover: the strongest hue (and a second one, for a two-color gradient),
+// darkened to sit behind white text, plus a light accent of the same hue for the buttons.
+// Hues are grouped in 24 bins weighted by saturation, so a few vivid colors win over a large white or gray area,
+// and the colors aren't averaged together (averaging many hues is what made "muddy brown").
 const tintCache={};
+function toHsl(r,g,b){
+  r/=255;g/=255;b/=255;const mx=Math.max(r,g,b),mn=Math.min(r,g,b),l=(mx+mn)/2,dl=mx-mn;
+  let h=0;if(dl)h=(mx===r?((g-b)/dl+6)%6:mx===g?(b-r)/dl+2:(r-g)/dl+4)*60;
+  return [h,dl?dl/(1-Math.abs(2*l-1)):0,l];
+}
+function coverColors(d){                    // d: RGBA pixels of the cover, scaled down
+  const bins=Array.from({length:24},()=>({w:0,r:0,g:0,b:0}));let n=0,cn=0;
+  for(let i=0;i<d.length;i+=4){
+    if(d[i+3]<128)continue;n++;
+    const [h,s,l]=toHsl(d[i],d[i+1],d[i+2]);
+    if(s<.2||l<.12||l>.9)continue;          // grays, near black/white
+    cn++;
+    const wt=s*s*Math.max(.05,1-Math.abs(l-.5)*1.6),bn=bins[Math.floor(h/15)%24];   // favor vivid mid tones
+    bn.w+=wt;bn.r+=d[i]*wt;bn.g+=d[i+1]*wt;bn.b+=d[i+2]*wt;
+  }
+  if(!n||cn<n*.03)return null;              // black and white cover
+  const at=i=>bins[(i+24)%24],score=i=>at(i-1).w*.5+at(i).w+at(i+1).w*.5;
+  const hueOf=k=>{let w=0,r=0,g=0,b=0;for(const bn of [at(k-1),at(k),at(k+1)]){w+=bn.w;r+=bn.r;g+=bn.g;b+=bn.b}return toHsl(r/w,g/w,b/w)};
+  let best=0;for(let i=1;i<24;i++)if(score(i)>score(best))best=i;
+  let sec=-1;for(let i=0;i<24;i++){const dd=Math.min(Math.abs(i-best),24-Math.abs(i-best));if(dd>=4&&(sec<0||score(i)>score(sec)))sec=i}
+  const cl=(v,a,z)=>Math.min(z,Math.max(a,v));
+  const dark=([h,s])=>`hsl(${Math.round(h)} ${Math.round(cl(s*1.1,.45,.8)*100)}% ${h>=40&&h<=75?24:28}%)`;   // yellows look brighter
+  const [h,s]=hueOf(best),bg=dark([h,s]);
+  return {bg,bg2:sec>=0&&score(sec)>=score(best)*.18?dark(hueOf(sec)):bg,
+    ac:`hsl(${Math.round(h)} ${Math.round(cl(s,.6,.9)*100)}% ${h>=200&&h<=280?72:64}%)`};
+}
 function albumTint(a){
   if(tintCache[a.id])return Promise.resolve(tintCache[a.id]);
-  const fallback=`hsl(${hue((a.name||"")+(a.artist||""))} 35% 26%)`;     // same hue as the placeholder cover
+  const ph=`hsl(${hue((a.name||"")+(a.artist||""))} 35% 26%)`,gray={bg:"hsl(0 0% 17%)",bg2:"hsl(0 0% 17%)",ac:""};
   return new Promise(res=>{
     const img=new Image();
     img.onload=()=>{
       try{
-        const c=document.createElement("canvas");c.width=c.height=24;
-        const x=c.getContext("2d");x.drawImage(img,0,0,24,24);const d=x.getImageData(0,0,24,24).data;
-        let r=0,g=0,b=0,w=0,R=0,G=0,B=0,n=0;
-        for(let i=0;i<d.length;i+=4){
-          const pr=d[i],pg=d[i+1],pb=d[i+2],mx=Math.max(pr,pg,pb),mn=Math.min(pr,pg,pb),l=(mx+mn)/510;
-          R+=pr;G+=pg;B+=pb;n++;
-          if(l<.08||l>.92)continue;                                       // skip near black/white
-          const sat=mx===mn?0:(mx-mn)/(255-Math.abs(mx+mn-255)),wt=sat*(1-Math.abs(l-.5))+.02;   // favor vivid mid tones
-          r+=pr*wt;g+=pg*wt;b+=pb*wt;w+=wt;
-        }
-        res(tintCache[a.id]=darkTint(w>0?[r/w,g/w,b/w]:[R/n,G/n,B/n]));
-      }catch(e){res(tintCache[a.id]=fallback)}
+        const c=document.createElement("canvas");c.width=c.height=48;
+        const x=c.getContext("2d");x.drawImage(img,0,0,48,48);
+        res(tintCache[a.id]=coverColors(x.getImageData(0,0,48,48).data)||gray);
+      }catch(e){res(tintCache[a.id]={bg:ph,bg2:ph,ac:""})}
     };
-    img.onerror=()=>res(tintCache[a.id]=fallback);
+    img.onerror=()=>res(tintCache[a.id]={bg:ph,bg2:ph,ac:""});   // same hue as the placeholder cover
     img.src=`/api/cover/${a.id}?v=${a.cv||0}`;
   });
 }
-function darkTint([r,g,b]){
-  r/=255;g/=255;b/=255;const mx=Math.max(r,g,b),mn=Math.min(r,g,b),l=(mx+mn)/2,dl=mx-mn;
-  let h=0,s=dl?dl/(1-Math.abs(2*l-1)):0;
-  if(dl)h=mx===r?((g-b)/dl)%6:mx===g?(b-r)/dl+2:(r-g)/dl+4;
-  return `hsl(${Math.round(h*60+360)%360} ${Math.round(Math.min(s,.6)*100)}% ${Math.round(Math.min(Math.max(l,.22),.34)*100)}%)`;
+function paint(el,c,pre){                   // c.ac is empty for gray covers: keep the default accent
+  el.style.setProperty(`--${pre}`,c.bg);el.style.setProperty(`--${pre}2`,c.bg2);
+  if(c.ac)el.style.setProperty("--ac",c.ac);else el.style.removeProperty("--ac");
 }
 function setTint(key,a){                    // key: which sheet asked, so a late answer can't tint another one
   const sh=$("#sheet"),meta=document.querySelector('meta[name="theme-color"]');
-  if(!a){sh.classList.remove("tinted");meta.content="#121212";return}
-  albumTint(a).then(c=>{if(openAlbum!==key)return;sh.style.setProperty("--tint",c);sh.classList.add("tinted");meta.content=c});
+  if(!a){sh.classList.remove("tinted");sh.style.removeProperty("--ac");meta.content="#121212";return}
+  albumTint(a).then(c=>{if(openAlbum!==key)return;paint(sh,c,"tint");sh.classList.add("tinted");meta.content=c.bg});
 }
 
 function setBarTint(tr){                   // player bar takes the color of the album that is playing
   const bar=$("#bar"),a=tr&&!tr.radio&&(byId[tr.album]||trackById[tr.id]?.a||{id:tr.album,name:tr.album_name,artist:""});
-  if(!a){bar.classList.remove("tinted");return}
-  albumTint(a).then(c=>{if(S.track?.id!==tr.id)return;bar.style.setProperty("--btint",c);bar.classList.add("tinted")});
+  if(!a){bar.classList.remove("tinted");bar.style.removeProperty("--ac");return}
+  albumTint(a).then(c=>{if(S.track?.id!==tr.id)return;paint(bar,c,"btint");bar.classList.add("tinted")});
 }
 
 let editing=false;
@@ -553,7 +572,7 @@ const countryName=st=>{try{return st.countrycode&&regionNames?.of(st.countrycode
 const radioKnown={};
 function regRadio(st){
   radioKnown[st.id]=st;
-  const t={id:st.id,title:st.title,artist:"",dur:0,fmt:st.fmt,q:st.q,n:0,disc:1,url:st.path,radio:true,country:countryName(st)};
+  const t={id:st.id,title:st.title,artist:"",dur:0,fmt:st.fmt,q:st.q,n:0,disc:1,url:st.path,hls:st.hls,radio:true,country:countryName(st)};
   const a={id:st.id,name:st.title,full:st.title,artist:countryName(st),year:"",cv:0,radio:true,tracks:[t]};
   trackById[st.id]={t,a};return a;
 }
@@ -782,11 +801,16 @@ function renderLyrics(force){
   }
   fetchLyrics(tr.id);
 }
-async function fetchLyrics(tid,artist,title){
+async function fetchLyrics(tid,artist,title,retry=1){
   const p=new URLSearchParams({id:tid});if(artist!=null){p.set("artist",artist);p.set("title",title)}
   const seq=++lySeq;
   let r;try{r=await (await fetch("/api/lyrics?"+p)).json()}catch(e){r={ok:false,error:T("Sem conexão com o servidor")}}
   if(seq!==lySeq||LY.tid!==tid||openAlbum!=="@ly")return;
+  if(!r.ok&&r.error&&retry){                 // LRCLIB slow or busy: try again by itself before showing the error
+    await new Promise(ok=>setTimeout(ok,1500));
+    if(seq===lySeq&&LY.tid===tid&&openAlbum==="@ly")fetchLyrics(tid,artist,title,retry-1);
+    return;
+  }
   LY.lines=null;LY.idx=-1;
   const form=lyForm(r.artist??S.track?.artist??"",r.title??S.track?.title??"");
   let h;
@@ -931,16 +955,41 @@ function localStatus(){
 }
 const lshow=()=>{if(mode==="local")show(localStatus())};
 
+// HLS streams (.m3u8, used by some radios): Safari and Android play them natively; other browsers use hls.js,
+// loaded only the first time one is needed
+let hlsLib=null,hlsPlayer=null;
+const isHls=t=>t?.radio&&(t.hls||/\.m3u8(\?|$)/i.test(t.url||""));
+function loadHls(){
+  return hlsLib??=new Promise((ok,fail)=>{const sc=document.createElement("script");
+    sc.src="https://cdn.jsdelivr.net/npm/hls.js@1.5.20/dist/hls.min.js";sc.onload=()=>ok(window.Hls);sc.onerror=()=>{hlsLib=null;fail(new Error("hls.js"))};
+    document.head.append(sc)});
+}
+function hlsStop(){if(hlsPlayer){hlsPlayer.destroy();hlsPlayer=null}}
+
 let LC={tid:null};                          // listening counter for the current local track
 function localPlay(queue,pos,t=0,autoplay=true){
   if(pos<0||pos>=queue.length){localStop();return}
   L.queue=queue;L.pos=pos;L.err="";LC={tid:queue[pos],heard:0,last:null,counted:false};
-  au.src=trackById[queue[pos]]?.t.url||"/api/stream/"+queue[pos];       // radio: the stream itself
+  hlsStop();
+  const tr=trackById[queue[pos]]?.t,url=tr?.url||"/api/stream/"+queue[pos];       // radio: the stream itself
+  const fail=e=>{L.err=e.name==="NotAllowedError"?T("Toque em ▶ para começar a tocar aqui"):T("Não consegui tocar: ")+e.message;lshow()};
+  if(isHls(tr)&&!au.canPlayType("application/vnd.apple.mpegurl")){
+    au.removeAttribute("src");
+    loadHls().then(Hls=>{
+      if(L.queue!==queue||L.pos!==pos)return;
+      if(!Hls.isSupported())throw new Error(T("Este navegador não conseguiu tocar {what}",{what:"HLS"}));
+      hlsPlayer=new Hls();hlsPlayer.loadSource(url);hlsPlayer.attachMedia(au);
+      hlsPlayer.on(Hls.Events.ERROR,(ev,d)=>{if(d.fatal){L.err=T("Não consegui tocar: ")+(d.details||d.type);hlsStop();lshow()}});
+      if(autoplay)au.play().catch(fail);
+    }).catch(fail);
+    lshow();return;
+  }
+  au.src=url;
   if(t>1)au.addEventListener("loadedmetadata",()=>{au.currentTime=t},{once:true});
-  if(autoplay)au.play().catch(e=>{L.err=e.name==="NotAllowedError"?T("Toque em ▶ para começar a tocar aqui"):T("Não consegui tocar: ")+e.message;lshow()});
+  if(autoplay)au.play().catch(fail);
   lshow();
 }
-function localStop(){au.pause();au.removeAttribute("src");au.load();L.pos=-1;lshow()}
+function localStop(){hlsStop();au.pause();au.removeAttribute("src");au.load();L.pos=-1;lshow()}
 au.addEventListener("ended",()=>localPlay(L.queue,L.pos+1));
 au.addEventListener("error",()=>{
   if(!au.getAttribute("src"))return;

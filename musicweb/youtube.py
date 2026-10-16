@@ -1,6 +1,7 @@
 """YouTube: resolves links and playlists with yt-dlp and keeps the history of played videos/playlists."""
 import importlib.util, json, os, re, shutil, subprocess, sys, threading, time
 
+from . import pot
 from .config import cfg
 from .i18n import _
 from .state import lock, state, yt_items, yt_playlists
@@ -93,7 +94,7 @@ def run_ytdlp(args, timeout=90):
     if not cmd:
         raise ValueError(_("yt-dlp não está instalado no servidor (pip install yt-dlp)"))
     try:
-        extra = ["--cookies", os.path.expanduser(cfg.yt_cookies)] if cfg.yt_cookies else []
+        extra = (["--cookies", os.path.expanduser(cfg.yt_cookies)] if cfg.yt_cookies else []) + pot.ytdlp_args(cmd)
         r = subprocess.run(cmd + extra + ["--no-warnings"] + args, capture_output=True, text=True, timeout=timeout)
     except subprocess.TimeoutExpired:
         raise ValueError(_("o YouTube demorou demais para responder"))
@@ -101,7 +102,8 @@ def run_ytdlp(args, timeout=90):
         errs = [l for l in r.stderr.splitlines() if "ERROR" in l] or r.stderr.strip().splitlines() or ["erro desconhecido"]
         if "confirm you" in errs[-1] and "bot" in errs[-1]:
             raise ValueError(_("o YouTube pediu login para confirmar que não é um robô. Atualize o yt-dlp "
-                               "(pip install -U yt-dlp) ou configure [youtube] cookies no config.toml"))
+                               "(pip install -U yt-dlp), instale o gerador de PO token (./pot-setup.sh) "
+                               "ou configure [youtube] cookies no config.toml"))
         if "Private video" in errs[-1] or "unavailable" in errs[-1].lower():
             raise ValueError(_("este vídeo é privado ou não está disponível"))
         raise ValueError(re.sub(r"^ERROR:\s*(\[[^\]]*\]\s*)?(\S+:\s*)?", "", errs[-1]))

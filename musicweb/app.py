@@ -1,8 +1,8 @@
 """Entry point: reads the configuration, loads the library and starts the server."""
-import argparse, threading, time
+import argparse, signal, sys, threading, time
 from http.server import ThreadingHTTPServer
 
-from . import covers, db, radio, youtube
+from . import covers, db, pot, radio, youtube
 from .config import cfg
 from .library import scan, watch_library
 from .player import monitor, mpv_events, mpv_start, restore_queue
@@ -31,11 +31,13 @@ def main(argv=None):
     covers.load_versions()
     youtube.load_history()
     radio.load()
+    signal.signal(signal.SIGTERM, lambda *a: sys.exit(0))   # "kill" also stops the PO token server (atexit)
+    pot_status = pot.start()
     t0 = time.time()
     _, read = scan(cfg.root)
     print(f"{len(tracks)} faixas em {len(albums)} álbuns ({cfg.root}) em {time.time() - t0:.1f}s, "
           f"{read} arquivos lidos; mutagen={'sim' if mutagen else 'não'}; "
-          f"yt-dlp={'sim' if youtube.ytdlp_cmd() else 'não'}; config={cfg.source or 'padrão'}")
+          f"yt-dlp={'sim' if youtube.ytdlp_cmd() else 'não'}; PO token={pot_status}; config={cfg.source or 'padrão'}")
     mpv_start()
     threading.Thread(target=mpv_events, daemon=True).start()
     threading.Thread(target=monitor, daemon=True).start()

@@ -8,3 +8,7 @@ mutagen>=1.45
 # Tocar o áudio de links do YouTube. Sem versão máxima de propósito: o YouTube muda com frequência
 # e só a versão mais nova do yt-dlp costuma funcionar (pip install -U yt-dlp)
 yt-dlp
+
+# Plugin do yt-dlp que pede o PO token ao servidor bgutil, para passar pelo "confirme que não é um robô"
+# sem cookies. Sozinho não faz nada: o servidor (Node.js) é instalado pelo ./pot-setup.sh
+bgutil-ytdlp-pot-provider
