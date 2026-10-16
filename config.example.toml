@@ -1,31 +1,41 @@
-# Configuração do musicweb.
-# Copie para config.toml (nesta pasta) ou ~/.config/musicweb/config.toml e ajuste.
-# Tudo é opcional: o que ficar de fora usa o valor padrão mostrado aqui.
-# Variáveis de ambiente (MPV_AO, PLAYER_NAME, ...) e a linha de comando têm prioridade sobre este arquivo.
+# musicweb configuration.
+# Copy to config.toml (in this folder) or ~/.config/musicweb/config.toml and adjust.
+# Everything is optional: anything left out uses the default shown here.
+# Environment variables (MPV_AO, PLAYER_NAME, ...) and the command line take precedence over this file.
 
 [server]
-host = "0.0.0.0"              # "0.0.0.0" = aceita conexões de outros aparelhos da rede
+host = "0.0.0.0"              # "0.0.0.0" = accept connections from other devices on the network
 port = 8080
-player_name = "Receiver"      # nome da saída de áudio do celular, mostrado na página
+player_name = "Receiver"      # name of the phone audio output, shown on the page
 
 [library]
 music_dir = "~/storage/music"
-rescan_every = 60             # segundos entre buscas por músicas novas (0 desliga)
-trash_dir = ""                # vazio = pasta .musicweb-lixeira ao lado da biblioteca
+rescan_every = 60             # seconds between checks for new music (0 disables)
+trash_dir = ""                # empty = .musicweb-lixeira folder next to the library
 
 [mpv]
-audio_output = "opensles"     # saída de áudio do mpv (--ao)
+audio_output = "opensles"     # mpv audio output (--ao)
+
+[player]
+resume_on_start = false       # after a restart, play the saved queue right away (false = wait for "play")
+
+[history]
+enabled = true                # record plays for "Histórico" and "Mais tocadas"
+min_seconds = 30              # listening time before a track counts as played (half the track if shorter)
 
 [covers]
-online = true                 # busca capas no iTunes / MusicBrainz quando não há capa local
+online = true                 # look up covers on iTunes / MusicBrainz when there is no local cover
 
 [lyrics]
-online = true                 # busca letras no LRCLIB quando não há .lrc nem letra nas tags
+online = true                 # look up lyrics on LRCLIB when there is no .lrc file or lyrics in the tags
 
 [youtube]
-cookies = ""                  # caminho de um cookies.txt, se o YouTube pedir login ("não sou um robô")
-max_history = 50              # quantos vídeos ficam em "Tocados recentemente"
+cookies = ""                  # path to a cookies.txt, in case YouTube asks to sign in ("not a bot")
+max_history = 50              # videos kept in "Tocados recentemente"
 format = "bestaudio[ext=m4a]/bestaudio[acodec^=mp4a]/bestaudio/best"
 
 [cache]
-dir = "~/.cache/musicweb"     # capas, letras e histórico do YouTube
+dir = "~/.cache/musicweb"     # disposable: covers, lyrics and YouTube history
+
+[data]
+dir = "~/.local/share/musicweb"   # musicweb.db (SQLite): scan cache, play history and the saved queue

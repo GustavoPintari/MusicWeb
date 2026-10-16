@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Atalho para iniciar o musicweb: python server.py [PASTA_DE_MUSICAS] [--port 8080] [--config arquivo]
+"""Shortcut to start musicweb: python server.py [MUSIC_DIR] [--port 8080] [--config FILE]
 
-O código fica no pacote musicweb/ e a configuração no config.toml (veja o README.md).
+The code lives in the musicweb/ package and the settings in config.toml (see README.md).
 """
 from musicweb.app import main
 

@@ -1,4 +1,4 @@
-"""Alterações na biblioteca: editar tags e remover álbuns."""
+"""Library changes: editing tags and removing albums."""
 import os, shutil, time
 
 from .config import cfg
@@ -55,7 +55,7 @@ def edit_album(body):
     return {"ok": not errors, "errors": errors, "album": new_id}
 
 
-# ---------------------------------------------------------------- remover álbum
+# ---------------------------------------------------------------- remove album
 
 
 def remove_album(aid, permanent=False):
@@ -71,7 +71,7 @@ def remove_album(aid, permanent=False):
         mpv_cmd(["stop"])
     root = os.path.realpath(cfg.root)
     adir = os.path.realpath(a["dir"])
-    # a pasta inteira só vai junto se for exclusiva deste álbum
+    # the whole folder goes only if it belongs to this album alone
     own_dir = (not a["shared"] and adir != root and inside_root(adir)
                and all(os.path.realpath(p).startswith(adir + os.sep) for p in paths))
     other_audio = False
@@ -82,7 +82,7 @@ def remove_album(aid, permanent=False):
                 other_audio = True
                 break
     targets = [adir] if own_dir and not other_audio else list(paths)
-    if targets != [adir]:                     # leva junto a capa com o nome do álbum
+    if targets != [adir]:                     # also take the cover named after the album
         names = {safe_name(a["full"]).lower(), a["name"].lower(), a["full"].lower()}
         try:
             for f in os.listdir(a["dir"]):
@@ -106,7 +106,7 @@ def remove_album(aid, permanent=False):
                                             if p != adir else os.path.basename(p)))
         except Exception as e:
             errors.append(f"{os.path.basename(p)}: {e}")
-    # apaga pastas que ficaram vazias (ex.: pasta do artista)
+    # remove folders left empty (e.g. the artist folder)
     d = os.path.dirname(adir if targets == [adir] else paths[0])
     while d != root and inside_root(d):
         try:

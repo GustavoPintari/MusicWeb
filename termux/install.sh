@@ -1,7 +1,7 @@
 #!/data/data/com.termux/files/usr/bin/sh
-# Prepara o musicweb no Termux: pacotes, dependências Python e início automático (Termux:Boot).
-# Uso: sh termux/install.sh            (pode rodar de novo para atualizar)
-#      sh termux/install.sh --no-boot  (não configura o início automático)
+# Sets musicweb up on Termux: packages, Python dependencies and start on boot (Termux:Boot).
+# Usage: sh termux/install.sh            (safe to run again to update)
+#        sh termux/install.sh --no-boot  (skips start on boot)
 set -e
 
 DIR=$(cd "$(dirname "$0")/.." && pwd)
@@ -29,7 +29,7 @@ chmod +x "$DIR/termux/start.sh" "$DIR/termux/stop.sh"
 if [ "$BOOT" = 1 ]; then
     echo "==> Início automático (Termux:Boot)"
     mkdir -p "$HOME/.termux/boot"
-    # copia o script trocando a pasta padrão pela pasta real do projeto
+    # copy the script, replacing the default folder with the real project folder
     sed "s|^MUSICWEB_DIR=.*|MUSICWEB_DIR=\"$DIR\"|" "$DIR/termux/boot/musicweb.sh" > "$HOME/.termux/boot/musicweb.sh"
     chmod +x "$HOME/.termux/boot/musicweb.sh"
     echo "    Instalado em ~/.termux/boot/musicweb.sh"

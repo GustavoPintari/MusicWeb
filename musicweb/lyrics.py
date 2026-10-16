@@ -1,4 +1,4 @@
-"""Letras: arquivo .lrc/.txt, tags da música ou LRCLIB (lrclib.net)."""
+"""Lyrics: .lrc/.txt file, the track tags or LRCLIB (lrclib.net)."""
 import json, os, re, time
 import urllib.error, urllib.parse
 
@@ -26,7 +26,7 @@ def lyr_pack(text, src):
 
 
 def lyrics_local(t):
-    """Arquivo .lrc/.txt com o mesmo nome da música, ou letra gravada nas tags."""
+    """.lrc/.txt file with the same name as the track, or lyrics stored in the tags."""
     stem = os.path.splitext(t["path"])[0]
     for ext in (".lrc", ".LRC", ".txt"):
         if os.path.isfile(stem + ext):
@@ -58,7 +58,7 @@ def lyrics_local(t):
 
 
 def lrclib_get(url):
-    """GET no LRCLIB; se ele pedir para esperar (429), espera e tenta mais uma vez."""
+    """GET on LRCLIB; if it asks us to wait (429), waits and tries once more."""
     try:
         return http_get(url, True)
     except urllib.error.HTTPError as e:
@@ -77,7 +77,7 @@ def lrclib(artist, title, album="", dur=0):
         return {"ok": True, "synced": synced, "plain": "" if synced else (r.get("plainLyrics") or ""),
                 "instrumental": bool(r.get("instrumental")) and not synced and not r.get("plainLyrics"), "src": "LRCLIB"}
 
-    if artist and dur:                                             # busca exata (artista + faixa + duração)
+    if artist and dur:                                             # exact lookup (artist + track + duration)
         p = {"artist_name": artist, "track_name": title, "duration": dur}
         if album:
             p["album_name"] = album
@@ -86,12 +86,12 @@ def lrclib(artist, title, album="", dur=0):
             if has(r):
                 return pack(r)
         except urllib.error.HTTPError as e:
-            if e.code not in (400, 404, 429):       # sem resultado exato: tenta a busca
+            if e.code not in (400, 404, 429):       # no exact match: fall back to search
                 raise
     searches = ([{"track_name": title, "artist_name": artist}] if artist else []) + [{"q": f"{artist} {title}".strip()}]
     for p in searches:
         cands = [r for r in lrclib_get(base + "search?" + urllib.parse.urlencode(p)) if has(r)]
-        # prefere duração parecida (mesma versão) e letra sincronizada
+        # prefer a similar duration (same version) and synced lyrics
         cands.sort(key=lambda r: (bool(dur) and abs((r.get("duration") or 0) - dur) > 3, not r.get("syncedLyrics")))
         if cands:
             return pack(cands[0])

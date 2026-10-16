@@ -1,12 +1,12 @@
-"""Ponto de entrada: lê a configuração, carrega a biblioteca e sobe o servidor."""
-import argparse, threading
+"""Entry point: reads the configuration, loads the library and starts the server."""
+import argparse, threading, time
 from http.server import ThreadingHTTPServer
 
-from . import covers, youtube
+from . import covers, db, youtube
 from .config import cfg
 from .library import scan, watch_library
-from .player import mpv_events, mpv_start
-from .state import albums, tracks
+from .player import monitor, mpv_events, mpv_start, restore_queue
+from .state import albums, state, tracks
 from .util import mutagen
 from .web import H
 
@@ -27,13 +27,20 @@ def main(argv=None):
     if a.host:
         cfg.host = a.host
 
+    db.open_db(cfg.db_file)
     covers.load_versions()
     youtube.load_history()
-    scan(cfg.root)
-    print(f"{len(tracks)} faixas em {len(albums)} álbuns ({cfg.root}); mutagen={'sim' if mutagen else 'não'}; "
+    t0 = time.time()
+    _, read = scan(cfg.root)
+    print(f"{len(tracks)} faixas em {len(albums)} álbuns ({cfg.root}) em {time.time() - t0:.1f}s, "
+          f"{read} arquivos lidos; mutagen={'sim' if mutagen else 'não'}; "
           f"yt-dlp={'sim' if youtube.ytdlp_cmd() else 'não'}; config={cfg.source or 'padrão'}")
     mpv_start()
     threading.Thread(target=mpv_events, daemon=True).start()
+    threading.Thread(target=monitor, daemon=True).start()
+    if restore_queue():
+        print(f"Fila restaurada: {len(state['queue'])} faixas"
+              f"{' (tocando)' if cfg.resume_on_start else ' (pausada; aperte play para continuar)'}")
     if cfg.rescan_every > 0:
         threading.Thread(target=watch_library, daemon=True).start()
     print(f"Abra http://<ip-do-celular>:{cfg.port}")

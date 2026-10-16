@@ -1,7 +1,7 @@
 #!/data/data/com.termux/files/usr/bin/sh
-# Termux:Boot: inicia o musicweb quando o celular liga.
-# Instalado em ~/.termux/boot/ pelo termux/install.sh (que preenche MUSICWEB_DIR).
-# Para instalar à mão: copie para ~/.termux/boot/, ajuste MUSICWEB_DIR e dê chmod +x.
+# Termux:Boot: starts musicweb when the phone boots.
+# Installed in ~/.termux/boot/ by termux/install.sh (which fills in MUSICWEB_DIR).
+# To install by hand: copy to ~/.termux/boot/, set MUSICWEB_DIR and chmod +x it.
 
 MUSICWEB_DIR="$HOME/MusicWeb"
 

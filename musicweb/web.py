@@ -1,13 +1,14 @@
-"""Servidor HTTP: página, API JSON, streaming e downloads."""
+"""HTTP server: the page, the JSON API, streaming and downloads."""
 import json, os, re, urllib.error, urllib.parse, urllib.request, zipfile
 from http.server import BaseHTTPRequestHandler
 
 from .config import cfg
 from .covers import cover_candidates, cover_from_url, get_cover, set_cover
 from .editor import edit_album, remove_album
+from .history import record_play, stats
 from .library import library_json, scan
 from .lyrics import get_lyrics
-from .player import mpv_cmd, play_pos, status
+from .player import mpv_cmd, pause, play_pos, resume, seek, status, stop
 from .state import albums, lock, state, tracks, yt_items
 from .util import MIME, safe_name, sniff, zip_name
 from .youtube import yt_add, yt_direct, yt_remove
@@ -19,7 +20,7 @@ MAX_UPLOAD = 20 * 1024 * 1024
 
 
 class _Counter:
-    """Conta bytes escritos (zipfile precisa de tell() em fluxo não-pesquisável)."""
+    """Counts bytes written (zipfile needs tell() on a non-seekable stream)."""
     def __init__(self, w):
         self.w, self.n = w, 0
 
@@ -62,6 +63,12 @@ class H(BaseHTTPRequestHandler):
             self.send(json.dumps(cover_candidates(q.get("q", [""])[0])))
         elif p == "/api/lyrics":
             self.send(json.dumps(get_lyrics(q.get("id", [""])[0], q.get("artist", [""])[0], q.get("title", [""])[0])))
+        elif p == "/api/stats":
+            try:
+                days = int(q.get("days", ["0"])[0])
+            except ValueError:
+                days = 0
+            self.send(json.dumps(stats(days)))
         elif p.startswith("/api/stream/yt_"):
             self.yt_stream(p.rsplit("/", 1)[1], "dl" in q)
         elif p.startswith("/api/stream/"):
@@ -88,7 +95,7 @@ class H(BaseHTTPRequestHandler):
             if m.group(1):
                 start = int(m.group(1))
                 end = min(int(m.group(2)), size - 1) if m.group(2) else size - 1
-            else:                                   # "bytes=-500": últimos 500 bytes
+            else:                                   # "bytes=-500": last 500 bytes
                 start = max(0, size - int(m.group(2)))
             if start > end:
                 self.send_response(416)
@@ -118,14 +125,14 @@ class H(BaseHTTPRequestHandler):
                     self.wfile.write(chunk)
                     left -= len(chunk)
         except (BrokenPipeError, ConnectionResetError):
-            pass                                    # o navegador cancelou (normal ao pular trechos)
+            pass                                    # the browser cancelled (normal when seeking)
 
     def yt_stream(self, tid, attachment=False):
-        """Repassa o áudio do YouTube (com Range, para poder pular trechos)."""
+        """Relays the YouTube audio (with Range, so seeking works)."""
         if tid not in yt_items:
             return self.send("{}", code=404)
         r = None
-        for attempt in range(2):                     # na 2ª tentativa pede um link novo (o antigo expirou)
+        for attempt in range(2):                     # 2nd attempt asks for a new link (the old one expired)
             try:
                 url, headers, _ = yt_direct(tid, force=attempt > 0)
             except Exception as e:
@@ -167,7 +174,7 @@ class H(BaseHTTPRequestHandler):
                         break
                     self.wfile.write(chunk)
             except OSError:
-                pass                                 # o navegador/mpv cancelou (normal ao pular trechos)
+                pass                                 # the browser/mpv cancelled (normal when seeking)
 
     def download(self, aid):
         with lock:
@@ -183,7 +190,7 @@ class H(BaseHTTPRequestHandler):
         self.end_headers()
         base = os.path.realpath(a["dir"])
         try:
-            # ZIP_STORED: áudio já é comprimido, e assim o celular não gasta CPU
+            # ZIP_STORED: audio is already compressed, and this spares the phone CPU
             with zipfile.ZipFile(_Counter(self.wfile), "w", zipfile.ZIP_STORED, allowZip64=True) as z:
                 for f in files:
                     rel = os.path.relpath(f, base) if f.startswith(base + os.sep) else os.path.basename(f)
@@ -198,7 +205,7 @@ class H(BaseHTTPRequestHandler):
     def do_POST(self):
         n = int(self.headers.get("Content-Length") or 0)
         p, _, qs = self.path.partition("?")
-        if p == "/api/cover_upload":                 # corpo = a imagem em si
+        if p == "/api/cover_upload":                 # body = the image itself
             if n > MAX_UPLOAD:
                 return self.send('{"ok":false,"error":"imagem grande demais"}', code=413)
             data = self.rfile.read(n)
@@ -226,22 +233,25 @@ class H(BaseHTTPRequestHandler):
                 state["queue"] = list(queue)
             play_pos(pos, float(body.get("t") or 0))
         elif p == "/api/pause":
-            mpv_cmd(["set_property", "pause", True])
+            pause()
         elif p == "/api/resume":
-            mpv_cmd(["set_property", "pause", False])
+            resume()
         elif p == "/api/stop":
-            state["active"] = False
-            mpv_cmd(["stop"])
+            stop()
         elif p == "/api/next":
             play_pos(state["pos"] + 1)
         elif p == "/api/prev":
-            t = mpv_cmd(["get_property", "time-pos"])[0] or 0
-            if t > 5:                                    # como num player comum: volta ao início
-                mpv_cmd(["seek", 0, "absolute"])
+            with lock:
+                restored = None if state["active"] else state["restored"]
+            t = restored if restored is not None else (mpv_cmd(["get_property", "time-pos"])[0] or 0)
+            if t > 5:                                    # like any player: back to the start of the track
+                seek(0)
             else:
                 play_pos(max(0, state["pos"] - 1))
         elif p == "/api/seek":
-            mpv_cmd(["seek", float(body.get("t", 0)), "absolute"])
+            seek(float(body.get("t", 0)))
+        elif p == "/api/played":                         # the browser ("this device") listened to a track
+            return self.send(json.dumps({"ok": record_play(str(body.get("id", "")), "local")}))
         elif p == "/api/volume":
             if "delta" in body:
                 v = (mpv_cmd(["get_property", "volume"])[0] or 100) + float(body["delta"])

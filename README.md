@@ -21,6 +21,9 @@ It only needs the Python standard library. `mutagen` and `yt-dlp` are optional a
 - **Download** a whole album as a `.zip`.
 - 🎤 **Lyrics**: from a `.lrc`/`.txt` file, the tags or [LRCLIB](https://lrclib.net). Synced lyrics highlight the current line and let you jump to it.
 - ▶ **YouTube**: paste a link and play only the audio, on either output.
+- 📊 **Tocadas** (played) tab: most played tracks and artists (last 7 days, 30 days or all time) and the play history.
+- **Queue survives restarts**: after a reboot or crash, the queue comes back paused where it stopped — press play to continue.
+- **Fast startup** on large libraries: tags are read once and cached in SQLite; later scans only read new or changed files.
 
 ### Installation (Termux)
 
@@ -96,7 +99,11 @@ The file is looked up in this order: `--config`, the `MUSICWEB_CONFIG` variable,
 | `[youtube] cookies` | *(empty)* | `cookies.txt` in case YouTube asks you to sign in |
 | `[youtube] max_history` | `50` | videos kept in "Tocados recentemente" (recently played) |
 | `[youtube] format` | m4a / best audio | format requested from yt-dlp |
-| `[cache] dir` | `~/.cache/musicweb` | covers, lyrics and YouTube history |
+| `[player] resume_on_start` | `false` | after a restart, play the saved queue right away |
+| `[history] enabled` | `true` | record plays (history and most played) |
+| `[history] min_seconds` | `30` | listening time before a track counts as played (half the track if shorter) |
+| `[cache] dir` | `~/.cache/musicweb` | covers, lyrics and YouTube history (disposable) |
+| `[data] dir` | `~/.local/share/musicweb` | `musicweb.db`: scan cache, play history and saved queue |
 
 **Priority:** defaults < `config.toml` < environment variables < command line.
 The older variables still work: `MPV_AO`, `COVERS_ONLINE`, `LYRICS_ONLINE`, `RESCAN_EVERY`, `PLAYER_NAME`, `YT_COOKIES`, `TRASH`, `MUSIC_DIR`.
@@ -134,6 +141,16 @@ If you see *"o YouTube pediu login para confirmar que não é um robô"* (YouTub
 1. update yt-dlp: `pip install -U yt-dlp`;
 2. if it keeps happening, export your YouTube cookies ([how to](https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp)) and set `[youtube] cookies = "~/cookies.txt"`.
 
+### Database
+
+`musicweb.db` (SQLite, in `[data] dir`) stores:
+
+- **scan cache** — the tags of each file, with its modification time and size; only new or changed files are read again;
+- **play history** — one row per play; a track counts after `min_seconds` of actual listening (seeking doesn't count), on mpv and in the browser;
+- **saved queue** — the queue, the current track and position (saved every ~10 s while playing and on pause).
+
+SQLite comes with Python, so there is nothing extra to install. To back up your history, copy `musicweb.db`; deleting it only resets the history and the queue (the scan cache is rebuilt on the next start).
+
 ### Project structure
 
 ```
@@ -149,9 +166,11 @@ musicweb/
 ├── app.py              startup (arguments, configuration, threads)
 ├── config.py           reads config.toml / environment
 ├── state.py            shared state (library, queue, YouTube history)
-├── library.py          folder scan, album grouping, automatic refresh
+├── db.py               SQLite: schema, scan cache, key/value storage
+├── history.py          play history and most played
+├── library.py          folder scan (with cache), album grouping, automatic refresh
 ├── covers.py           local, embedded and online covers; cover changes
-├── player.py           mpv control (queue, events, status)
+├── player.py           mpv control (queue, events, status, saved queue, play counting)
 ├── editor.py           tag editing and album removal
 ├── youtube.py          yt-dlp, direct links and history
 ├── lyrics.py           lyrics (.lrc, tags, LRCLIB)
@@ -160,7 +179,7 @@ musicweb/
 └── static/index.html   the page (HTML, CSS and JS in one file)
 ```
 
-Module dependencies (no cycles): `config` → `state`/`util` → `youtube` → `covers` → `library` / `player` / `lyrics` → `editor` → `web` → `app`.
+Module dependencies (no cycles): `config` → `state`/`util`/`db` → `youtube`/`history` → `covers` → `library` / `player` / `lyrics` → `editor` → `web` → `app`.
 
 ### API
 
@@ -173,6 +192,7 @@ Module dependencies (no cycles): `config` → `state`/`util` → `youtube` → `
 | GET | `/api/cover/<album>` | cover |
 | GET | `/api/cover_search?q=` | cover suggestions |
 | GET | `/api/lyrics?id=[&artist=&title=]` | lyrics |
+| GET | `/api/stats?days=` | most played tracks/artists and history (`days=0`: all time) |
 | POST | `/api/play` `{album}` or `{id, t}` | play on mpv |
 | POST | `/api/pause`, `/resume`, `/stop`, `/next`, `/prev` | controls |
 | POST | `/api/seek` `{t}` · `/api/volume` `{v}` or `{delta}` | position and volume |
@@ -180,6 +200,7 @@ Module dependencies (no cycles): `config` → `state`/`util` → `youtube` → `
 | POST | `/api/edit` · `/api/delete` | edit tags · remove album |
 | POST | `/api/cover_set` `{album, url}` · `/api/cover_upload?album=` | change cover |
 | POST | `/api/yt` `{url}` · `/api/yt_remove` `{id}` | YouTube |
+| POST | `/api/played` `{id}` | the browser reports a play ("this device" output) |
 
 ### License
 
@@ -202,6 +223,9 @@ Só usa a biblioteca padrão do Python. `mutagen` e `yt-dlp` são opcionais e li
 - **Baixar** o álbum inteiro em `.zip`.
 - 🎤 **Letras**: de arquivo `.lrc`/`.txt`, das tags ou do [LRCLIB](https://lrclib.net). Letras sincronizadas destacam a linha atual e permitem pular para ela.
 - ▶ **YouTube**: cole um link e toque só o áudio, em qualquer uma das saídas.
+- 📊 Aba **Tocadas**: músicas e artistas mais ouvidos (últimos 7 dias, 30 dias ou sempre) e o histórico de reprodução.
+- **Fila que sobrevive a reinício**: depois de religar o celular ou de uma queda, a fila volta pausada onde parou — é só apertar play.
+- **Inicialização rápida** em bibliotecas grandes: as tags são lidas uma vez e guardadas no SQLite; as varreduras seguintes só leem arquivos novos ou alterados.
 
 ### Instalação (Termux)
 
@@ -277,7 +301,11 @@ O arquivo é procurado nesta ordem: `--config`, variável `MUSICWEB_CONFIG`, `./
 | `[youtube] cookies` | *(vazio)* | `cookies.txt` caso o YouTube peça login |
 | `[youtube] max_history` | `50` | vídeos guardados em "Tocados recentemente" |
 | `[youtube] format` | m4a / melhor áudio | formato pedido ao yt-dlp |
-| `[cache] dir` | `~/.cache/musicweb` | capas, letras e histórico do YouTube |
+| `[player] resume_on_start` | `false` | depois de reiniciar, já toca a fila salva |
+| `[history] enabled` | `true` | registra as reproduções (histórico e mais tocadas) |
+| `[history] min_seconds` | `30` | tempo ouvindo até a música contar como tocada (metade da faixa, se for mais curta) |
+| `[cache] dir` | `~/.cache/musicweb` | capas, letras e histórico do YouTube (descartável) |
+| `[data] dir` | `~/.local/share/musicweb` | `musicweb.db`: cache da varredura, histórico e fila salva |
 
 **Prioridade:** padrão < `config.toml` < variáveis de ambiente < linha de comando.
 As variáveis antigas continuam valendo: `MPV_AO`, `COVERS_ONLINE`, `LYRICS_ONLINE`, `RESCAN_EVERY`, `PLAYER_NAME`, `YT_COOKIES`, `TRASH`, `MUSIC_DIR`.
@@ -315,6 +343,16 @@ Se aparecer *"o YouTube pediu login para confirmar que não é um robô"*:
 1. atualize o yt-dlp: `pip install -U yt-dlp`;
 2. se continuar, exporte os cookies do YouTube ([como fazer](https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp)) e configure `[youtube] cookies = "~/cookies.txt"`.
 
+### Banco de dados
+
+O `musicweb.db` (SQLite, em `[data] dir`) guarda:
+
+- **cache da varredura** — as tags de cada arquivo, com data de modificação e tamanho; só arquivos novos ou alterados são lidos de novo;
+- **histórico** — uma linha por reprodução; a música conta depois de `min_seconds` ouvindo de verdade (pular trechos não conta), tanto no mpv quanto no navegador;
+- **fila salva** — a fila, a faixa atual e a posição (salva a cada ~10 s tocando e ao pausar).
+
+O SQLite já vem com o Python, então não há nada extra para instalar. Para fazer backup do histórico, copie o `musicweb.db`; apagá-lo só zera o histórico e a fila (o cache da varredura é refeito na próxima inicialização).
+
 ### Estrutura do projeto
 
 ```
@@ -330,9 +368,11 @@ musicweb/
 ├── app.py              inicialização (argumentos, configuração, threads)
 ├── config.py           leitura do config.toml / ambiente
 ├── state.py            estado compartilhado (biblioteca, fila, histórico do YouTube)
-├── library.py          varredura da pasta, agrupamento em álbuns, atualização automática
+├── db.py               SQLite: esquema, cache da varredura, chave/valor
+├── history.py          histórico e mais tocadas
+├── library.py          varredura da pasta (com cache), agrupamento em álbuns, atualização automática
 ├── covers.py           capas locais, embutidas e online; troca de capa
-├── player.py           controle do mpv (fila, eventos, status)
+├── player.py           controle do mpv (fila, eventos, status, fila salva, contagem de reproduções)
 ├── editor.py           edição de tags e remoção de álbuns
 ├── youtube.py          yt-dlp, links diretos e histórico
 ├── lyrics.py           letras (.lrc, tags, LRCLIB)
@@ -341,7 +381,7 @@ musicweb/
 └── static/index.html   a página (HTML, CSS e JS num arquivo só)
 ```
 
-Dependências entre módulos (sem ciclos): `config` → `state`/`util` → `youtube` → `covers` → `library` / `player` / `lyrics` → `editor` → `web` → `app`.
+Dependências entre módulos (sem ciclos): `config` → `state`/`util`/`db` → `youtube`/`history` → `covers` → `library` / `player` / `lyrics` → `editor` → `web` → `app`.
 
 ### API
 
@@ -354,6 +394,7 @@ Dependências entre módulos (sem ciclos): `config` → `state`/`util` → `yout
 | GET | `/api/cover/<álbum>` | capa |
 | GET | `/api/cover_search?q=` | sugestões de capa |
 | GET | `/api/lyrics?id=[&artist=&title=]` | letra |
+| GET | `/api/stats?days=` | mais tocadas, artistas e histórico (`days=0`: sempre) |
 | POST | `/api/play` `{album}` ou `{id, t}` | toca no mpv |
 | POST | `/api/pause`, `/resume`, `/stop`, `/next`, `/prev` | controles |
 | POST | `/api/seek` `{t}` · `/api/volume` `{v}` ou `{delta}` | posição e volume |
@@ -361,6 +402,7 @@ Dependências entre módulos (sem ciclos): `config` → `state`/`util` → `yout
 | POST | `/api/edit` · `/api/delete` | editar tags · remover álbum |
 | POST | `/api/cover_set` `{album, url}` · `/api/cover_upload?album=` | trocar capa |
 | POST | `/api/yt` `{url}` · `/api/yt_remove` `{id}` | YouTube |
+| POST | `/api/played` `{id}` | o navegador avisa uma reprodução (saída "Este dispositivo") |
 
 ### Licença
 

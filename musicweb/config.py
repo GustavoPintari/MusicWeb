@@ -1,4 +1,4 @@
-"""Configuração: valores padrão < config.toml < variáveis de ambiente < linha de comando."""
+"""Configuration: defaults < config.toml < environment variables < command line."""
 import os
 from dataclasses import dataclass
 
@@ -9,7 +9,7 @@ except ImportError:
 
 PROJECT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-# (seção, chave do config.toml) -> (atributo, tipo)
+# (config.toml section, key) -> (attribute, type)
 FILE_KEYS = {
     ("server", "host"): ("host", str),
     ("server", "port"): ("port", int),
@@ -24,9 +24,13 @@ FILE_KEYS = {
     ("youtube", "max_history"): ("yt_max_history", int),
     ("youtube", "format"): ("yt_format", str),
     ("cache", "dir"): ("cache_dir", str),
+    ("data", "dir"): ("data_dir", str),
+    ("history", "enabled"): ("history_enabled", bool),
+    ("history", "min_seconds"): ("history_min_seconds", int),
+    ("player", "resume_on_start"): ("resume_on_start", bool),
 }
 
-# variáveis de ambiente aceitas (as antigas continuam funcionando)
+# accepted environment variables (the older ones keep working)
 ENV_KEYS = {
     "MPV_AO": ("mpv_ao", str),
     "COVERS_ONLINE": ("covers_online", bool),
@@ -49,27 +53,31 @@ def _conv(kind, v):
 class Config:
     host: str = "0.0.0.0"
     port: int = 8080
-    player_name: str = "Receiver"            # nome da saída de áudio do celular, mostrado na página
+    player_name: str = "Receiver"            # name of the phone audio output, shown on the page
     music_dir: str = "~/storage/music"
-    rescan_every: int = 60                   # segundos entre buscas por músicas novas; 0 desliga
-    trash_dir: str = ""                      # vazio = pasta .musicweb-lixeira ao lado da biblioteca
-    mpv_ao: str = "opensles"                 # saída de áudio do mpv
-    covers_online: bool = True               # busca capas no iTunes / MusicBrainz
-    lyrics_online: bool = True               # busca letras no LRCLIB
-    yt_cookies: str = ""                     # cookies.txt, se o YouTube pedir login
+    rescan_every: int = 60                   # seconds between checks for new music; 0 disables
+    trash_dir: str = ""                      # empty = .musicweb-lixeira folder next to the library
+    mpv_ao: str = "opensles"                 # mpv audio output
+    covers_online: bool = True               # look up covers on iTunes / MusicBrainz
+    lyrics_online: bool = True               # look up lyrics on LRCLIB
+    yt_cookies: str = ""                     # cookies.txt, if YouTube asks to sign in
     yt_max_history: int = 50
-    yt_format: str = "bestaudio[ext=m4a]/bestaudio[acodec^=mp4a]/bestaudio/best"   # m4a toca em qualquer navegador
-    cache_dir: str = "~/.cache/musicweb"
-    source: str = ""                         # de qual arquivo a configuração veio
+    yt_format: str = "bestaudio[ext=m4a]/bestaudio[acodec^=mp4a]/bestaudio/best"   # m4a plays in every browser
+    cache_dir: str = "~/.cache/musicweb"     # disposable: covers, lyrics, YouTube history
+    data_dir: str = "~/.local/share/musicweb"   # kept: SQLite database (scan cache, play history, queue)
+    history_enabled: bool = True             # record plays for history / most played
+    history_min_seconds: int = 30            # listening time before a track counts as played
+    resume_on_start: bool = False            # start playing the saved queue right away after a restart
+    source: str = ""                         # which file the configuration came from
 
-    # ---- caminhos derivados
+    # ---- derived paths
     @property
     def root(self):
         return os.path.abspath(os.path.expanduser(self.music_dir))
 
     @property
     def local_host(self):
-        """Endereço pelo qual o mpv acessa o próprio servidor (para tocar o YouTube)."""
+        """Address mpv uses to reach this server (to play YouTube)."""
         return self.host if self.host not in ("", "0.0.0.0", "::") else "127.0.0.1"
 
     @property
@@ -89,12 +97,16 @@ class Config:
         return os.path.join(self.cache, "youtube.json")
 
     @property
+    def db_file(self):
+        return os.path.join(os.path.expanduser(self.data_dir), "musicweb.db")
+
+    @property
     def trash(self):
         if self.trash_dir:
             return os.path.expanduser(self.trash_dir)
         return os.path.join(os.path.dirname(os.path.realpath(self.root)), ".musicweb-lixeira")
 
-    # ---- carregamento
+    # ---- loading
     def load(self, path=None):
         path = path or os.environ.get("MUSICWEB_CONFIG") or self._find()
         if path:
@@ -137,4 +149,4 @@ class Config:
         self.source = path
 
 
-cfg = Config()        # única instância; os outros módulos leem dela na hora do uso
+cfg = Config()        # single instance; other modules read it at call time

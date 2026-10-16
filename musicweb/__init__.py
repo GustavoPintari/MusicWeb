@@ -1,1 +1,1 @@
-"""musicweb: player de música auto-hospedado (Termux + mpv)."""
+"""musicweb: self-hosted music player (Termux + mpv)."""

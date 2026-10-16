@@ -1,4 +1,4 @@
-"""YouTube: resolve links com o yt-dlp e guarda o histórico de vídeos tocados."""
+"""YouTube: resolves links with yt-dlp and keeps the history of played videos."""
 import importlib.util, json, os, re, shutil, subprocess, sys, threading, time
 
 from .config import cfg
@@ -8,7 +8,7 @@ from .util import http_get
 
 YT_ID = re.compile(r"(?:[?&]v=|youtu\.be/|/shorts/|/live/|/embed/|/v/)([A-Za-z0-9_-]{11})")
 
-yt_urls = {}     # id -> (link direto do áudio, cabeçalhos, quando foi obtido)
+yt_urls = {}     # id -> (direct audio link, headers, when it was fetched)
 yt_locks, yt_locks_lock = {}, threading.Lock()
 
 
@@ -51,7 +51,7 @@ def ytdlp_cmd():
 
 
 def yt_resolve(vid):
-    """Pergunta ao yt-dlp os dados do vídeo e o link direto do áudio."""
+    """Asks yt-dlp for the video data and the direct audio link."""
     cmd = ytdlp_cmd()
     if not cmd:
         raise ValueError("yt-dlp não está instalado no servidor (pip install yt-dlp)")
@@ -78,7 +78,7 @@ def yt_resolve(vid):
 
 
 def yt_direct(tid, force=False):
-    """Link direto do áudio; o do YouTube expira em algumas horas, então é renovado."""
+    """Direct audio link; YouTube's expires after a few hours, so it is renewed."""
     with yt_locks_lock:
         lk = yt_locks.setdefault(tid, threading.Lock())
     with lk:
@@ -119,7 +119,7 @@ def yt_add(url):
         yt_urls[tid] = (direct, headers, time.time())
         title = info.get("title") or vid
         uploader = re.sub(r"\s*-\s*Topic$|VEVO$", "", info.get("uploader") or info.get("channel") or "").strip()
-        if info.get("track") and info.get("artist"):          # vídeos do YouTube Music trazem artista/faixa
+        if info.get("track") and info.get("artist"):          # YouTube Music videos carry artist/track metadata
             la, lt = info["artist"].split(",")[0].strip(), info["track"]
         else:
             la, lt = guess_artist_title(title, uploader)
@@ -129,7 +129,7 @@ def yt_add(url):
              "album": tid, "n": 0, "disc": 1, "l_artist": la, "l_title": lt}
     with lock:
         yt_items.pop(tid, None)
-        yt_items[tid] = y                         # vai para o fim = mais recente
+        yt_items[tid] = y                         # moves to the end = most recent
         playing = state["queue"][state["pos"]] if state["active"] and state["queue"] else None
         for old in [k for k in yt_items if k not in (tid, playing)][:max(0, len(yt_items) - cfg.yt_max_history)]:
             yt_items.pop(old)
