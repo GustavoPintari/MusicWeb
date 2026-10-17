@@ -14,6 +14,7 @@ function markPlaying(){
 function show(s){
   const prevId=S.track?.id,prevLive=S.track?.live;S=s;recvAt=performance.now();
   $("#pp").innerHTML=s.state==="playing"?PAUSE:PLAY;
+  $("#bar").classList.toggle("playing",s.state==="playing");
   if($("#err").textContent!==(s.error||"")){$("#err").textContent=s.error||"";fitBar()}
   if(s.track?.id!==prevId){
     const a=s.track&&(byId[s.track.album]||trackById[s.track.id]?.a);
@@ -38,13 +39,17 @@ function nowSub(tr){
   return `${esc(tr.artist||tr.album_artist)} — ${esc(tr.album_name)}`;
 }
 
-function tick(){
+function curTime(){                       // [position, duration] in seconds, interpolated between status polls
   let t=S.time||0;if(S.state==="playing")t+=(performance.now()-recvAt)/1000;
   if(mode==="local")t=au.currentTime||0;
-  const d=S.dur||0;t=d?Math.min(t,d):t;
+  const d=S.dur||0;return [d?Math.min(t,d):t,d];
+}
+function tick(){                            // the fill of the track is drawn every frame by viz.js
+  const [t,d]=curTime();
   lyTick(t);
-  $("#prog .fl").style.width=d&&S.track?(t/d*100)+"%":"0";
-  $("#tc").textContent=S.track?fmt(t):"";$("#td").textContent=S.track?.radio?T("AO VIVO"):S.track&&d?fmt(d):"";
+  if(!progDrag)$("#tc").textContent=S.track?fmt(t):"";
+  $("#td").textContent=S.track?.radio?T("AO VIVO"):S.track&&d?fmt(d):"";
+  vizWake();
 }
 
 // ---------- audio output: "remote" = phone on the receiver, "local" = this device
