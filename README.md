@@ -212,7 +212,21 @@ musicweb/
 ├── web.py              HTTP server: API routes, streaming and downloads
 ├── i18n.py             interface language for server messages (the page has its own dictionary)
 ├── util.py             small shared helpers
-└── static/index.html   the page (HTML, CSS and JS in one file)
+└── static/            the page, served as is (no build step)
+    ├── index.html      the HTML; loads the CSS and the scripts below in order
+    ├── app.css         styles
+    └── js/             plain scripts sharing one global scope, loaded in this order:
+        ├── util.js       shared helpers and state
+        ├── i18n.js       Portuguese → English dictionary
+        ├── colors.js     album colors and the album page background (glass / vinyl)
+        ├── library.js    album grid, artists, album page, tag editing, covers
+        ├── youtube.js    YouTube videos and playlists
+        ├── radio.js      internet radio
+        ├── plays.js      most played and history
+        ├── retro.js      retrospective
+        ├── lyrics.js     lyrics
+        ├── player.js     player bar and the two outputs (Receiver / this device)
+        └── main.js       events and startup
 ```
 
 Module dependencies (no cycles): `config` → `state`/`util`/`db`/`pot` → `youtube`/`history`/`radio` → `covers` → `library` / `player` / `lyrics` / `retro` → `editor` → `web` → `app`.
@@ -221,6 +235,7 @@ Module dependencies (no cycles): `config` → `state`/`util`/`db`/`pot` → `you
 
 | Method | Route | Description |
 |---|---|---|
+| GET | `/static/<file>` | the page's CSS and JS (the page links them with `?v=` + modification time, so updates are never stale) |
 | GET | `/api/library` | albums, tracks and YouTube history |
 | GET | `/api/status` | what mpv is playing |
 | GET | `/api/stream/<id>` | track audio (supports Range; `?dl` to download) |
@@ -454,7 +469,21 @@ musicweb/
 ├── web.py              servidor HTTP: rotas da API, streaming e downloads
 ├── i18n.py             idioma da interface nas mensagens do servidor (a página tem o próprio dicionário)
 ├── util.py             funções pequenas compartilhadas
-└── static/index.html   a página (HTML, CSS e JS num arquivo só)
+└── static/            a página, servida como está (sem etapa de build)
+    ├── index.html      o HTML; carrega o CSS e os scripts abaixo, em ordem
+    ├── app.css         estilos
+    └── js/             scripts comuns que dividem o mesmo escopo global, carregados nesta ordem:
+        ├── util.js       funções e estado compartilhados
+        ├── i18n.js       dicionário português → inglês
+        ├── colors.js     cores do álbum e fundo da página do álbum (vidro / vinil)
+        ├── library.js    grade de álbuns, artistas, página do álbum, edição de tags, capas
+        ├── youtube.js    vídeos e playlists do YouTube
+        ├── radio.js      rádios online
+        ├── plays.js      mais tocadas e histórico
+        ├── retro.js      retrospectiva
+        ├── lyrics.js     letras
+        ├── player.js     barra do player e as duas saídas (Receiver / este dispositivo)
+        └── main.js       eventos e inicialização
 ```
 
 Dependências entre módulos (sem ciclos): `config` → `state`/`util`/`db`/`pot` → `youtube`/`history`/`radio` → `covers` → `library` / `player` / `lyrics` / `retro` → `editor` → `web` → `app`.
@@ -463,6 +492,7 @@ Dependências entre módulos (sem ciclos): `config` → `state`/`util`/`db`/`pot
 
 | Método | Rota | Descrição |
 |---|---|---|
+| GET | `/static/<arquivo>` | CSS e JS da página (a página usa `?v=` + data de modificação, então uma atualização nunca fica velha no navegador) |
 | GET | `/api/library` | álbuns, faixas e histórico do YouTube |
 | GET | `/api/status` | o que o mpv está tocando |
 | GET | `/api/stream/<id>` | áudio da faixa (com Range; `?dl` para baixar) |

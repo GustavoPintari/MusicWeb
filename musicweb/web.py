@@ -17,6 +17,26 @@ from .util import MIME, safe_name, sniff, zip_name
 from .youtube import pl_public, yt_add, yt_check, yt_direct, yt_remove
 
 STATIC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
+STATIC_TYPES = {".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8"}
+STATIC_REF = re.compile(rb'(?:src|href)="/static/([^"?]+)"')
+
+
+def static_path(name):
+    """File inside static/ (None for anything else, e.g. "../")."""
+    path = os.path.realpath(os.path.join(STATIC, name))
+    if not path.startswith(os.path.realpath(STATIC) + os.sep) or not os.path.isfile(path):
+        return None
+    return path
+
+
+def versioned(page):
+    """Adds ?v=<modification time> to the page's CSS/JS links, so a browser never keeps an old copy
+    after an update (the files themselves can then be cached for a long time)."""
+    def add(m):
+        path = static_path(m.group(1).decode())
+        v = int(os.path.getmtime(path)) if path else 0
+        return m.group(0)[:-1] + f"?v={v}\"".encode()
+    return STATIC_REF.sub(add, page)
 
 
 MAX_UPLOAD = 20 * 1024 * 1024
@@ -59,7 +79,21 @@ class H(BaseHTTPRequestHandler):
             with open(os.path.join(STATIC, "index.html"), "rb") as fh:
                 page = fh.read()
             # the page reads the interface language from <html lang>
-            self.send(page.replace(b'<html lang="pt-BR">', f'<html lang="{cfg.lang}">'.encode(), 1), "text/html; charset=utf-8")
+            page = versioned(page.replace(b'<html lang="pt-BR">', f'<html lang="{cfg.lang}">'.encode(), 1))
+            self.send(page, "text/html; charset=utf-8")
+        elif p.startswith("/static/"):
+            path = static_path(urllib.parse.unquote(p[len("/static/"):]))
+            ctype = STATIC_TYPES.get(os.path.splitext(path or "")[1].lower())
+            if not path or not ctype:
+                return self.send("{}", code=404)
+            with open(path, "rb") as fh:
+                data = fh.read()
+            self.send_response(200)
+            self.send_header("Content-Type", ctype)
+            self.send_header("Content-Length", str(len(data)))
+            self.send_header("Cache-Control", "max-age=31536000, immutable" if "v=" in qs else "no-cache")
+            self.end_headers()
+            self.wfile.write(data)
         elif p == "/api/library":
             self.send(library_json())
         elif p == "/api/status":
