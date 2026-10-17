@@ -161,10 +161,10 @@ a.btn2:active{transform:scale(.92);filter:brightness(1.35)}
 #prog .tip{position:absolute;bottom:100%;left:0;transform:translateX(-50%);background:#2a2a2a;color:var(--fg);font-size:11px;
   padding:2px 6px;border-radius:4px;pointer-events:none;opacity:0;transition:opacity .15s;white-space:nowrap}
 #prog.tipon .tip{opacity:1}
-/* aurora: album colors that breathe with the music, behind the frosted glass; it rises a bit above the bar and fades out */
-#aura{position:absolute;left:0;right:0;bottom:0;width:100%;height:calc(100% + 70px);pointer-events:none;
-  -webkit-mask-image:linear-gradient(to top,#000 calc(100% - 70px),transparent);mask-image:linear-gradient(to top,#000 calc(100% - 70px),transparent)}
-#bar>:not(#aura){position:relative}
+/* visualizer band above the progress track (drawn by viz.js), only while it's on and something is loaded */
+#vzc{display:none;width:100%;height:48px;margin:2px 0 4px}
+#bar.vz #vzc{display:block}
+#vzb.on{color:var(--ac)}
 .pl{display:flex;align-items:center;gap:10px}
 #now{display:flex;align-items:center;gap:10px;flex:1;min-width:0;cursor:pointer}
 #now .cv{width:46px;flex:none;font-size:16px;border-radius:6px}

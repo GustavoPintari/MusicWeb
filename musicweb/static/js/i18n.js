@@ -8,6 +8,7 @@ const EN={
   "Buscar álbum, artista ou faixa…":"Search albums, artists or tracks…","Álbuns":"Albums","Artistas":"Artists","Tocadas":"Played",
   "Reescanear biblioteca":"Rescan library","‹ Voltar":"‹ Back","Letra da música":"Lyrics",
   "Anterior":"Previous","Tocar/Pausar":"Play/Pause","Próxima":"Next","Volume":"Volume","Parar":"Stop","Diminuir volume":"Volume down","Aumentar volume":"Volume up",
+  "Visualizador":"Visualizer","Agulhas":"Needles","Morros":"Hills","Desligado":"Off",
   "Sem conexão com o servidor":"No connection to the server","Erro na página: ":"Page error: ",
   "Nada encontrado":"Nothing found","Nenhuma música encontrada":"No music found","álbum":"album","álbuns":"albums","faixa":"track","faixas":"tracks","{n} faixas":"{n} tracks",
   "Tocar álbum":"Play album","Baixar":"Download","Editar":"Edit","Disco {n}":"Disc {n}",

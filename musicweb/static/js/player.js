@@ -30,7 +30,7 @@ function show(s){
     if(openAlbum==="@ly")renderLyrics();
   }
   if(mode==="remote"&&s.lib!=null&&libVer!=null&&s.lib!==libVer){libVer=s.lib;load()}
-  if(s.volume!=null&&!volDragging){$("#vr").value=s.volume;$("#vl").textContent=s.volume+"%"}
+  if(s.volume!=null&&!volDragging)volShow(s.volume);
   markPlaying();tick();
 }
 
