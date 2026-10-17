@@ -53,20 +53,36 @@ function albumTint(a){
     img.src=`/api/cover/${a.id}?v=${a.cv||0}`;
   });
 }
-function paint(el,c,pre){                   // c.ac is empty for gray covers: keep the default accent
+const DEFAULT_AC="#5aa9e6";                 // same as --ac in app.css
+function paint(el,c,pre){                   // c.ac is empty for gray covers: use the default accent
   el.style.setProperty(`--${pre}`,c.bg);el.style.setProperty(`--${pre}2`,c.bg2);el.style.setProperty(`--${pre}3`,c.bg3);
-  if(c.ac)el.style.setProperty("--ac",c.ac);else el.style.removeProperty("--ac");
+  el.style.setProperty("--ac",c.ac||DEFAULT_AC);
 }
 // key: which sheet asked, so a late answer can't tint another one. The player bar (frosted glass on every
-// page) takes the album's accent while its page is open; everywhere else both stay neutral.
+// page) takes the album's accent while its page is open; elsewhere both follow the album that is playing.
 function setTint(key,a){
   const sh=$("#sheet"),bar=$("#bar"),meta=document.querySelector('meta[name="theme-color"]');
   if(!a){sh.classList.remove("tinted");for(const el of [sh,bar])el.style.removeProperty("--ac");meta.content="#121212";return}
   albumTint(a).then(c=>{
     if(openAlbum!==key)return;
     paint(sh,c,"tint");
-    if(c.ac)bar.style.setProperty("--ac",c.ac);else bar.style.removeProperty("--ac");
+    bar.style.setProperty("--ac",c.ac||DEFAULT_AC);
     sh.style.setProperty("--cvurl",`url("/api/cover/${a.id}?v=${a.cv||0}")`);
     sh.classList.add("tinted");meta.content=c.bg;
+  });
+}
+
+// The album that is playing sets the app's colors: its accent on the home page, the player bar and the other
+// screens (an open album page uses its own), and a glow of its cover behind the top of the home page.
+let themeKey=null;
+function setHomeTheme(tr){
+  const a=tr&&!tr.radio&&(byId[tr.album]||trackById[tr.id]?.a||{id:tr.album,name:tr.album_name,artist:""}),root=document.documentElement;
+  themeKey=a?a.id:null;
+  if(!a){document.body.classList.remove("glowing");root.style.removeProperty("--ac");return}
+  albumTint(a).then(c=>{
+    if(themeKey!==a.id)return;
+    $("#glow").style.setProperty("--gurl",`url("/api/cover/${a.id}?v=${a.cv||0}")`);
+    document.body.classList.add("glowing");
+    if(c.ac)root.style.setProperty("--ac",c.ac);else root.style.removeProperty("--ac");
   });
 }
