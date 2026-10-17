@@ -59,7 +59,7 @@ function localStatus(){
   const st=!ti?"stopped":(!au.paused?"playing":(au.ended?"stopped":"paused"));
   return {state:st,time:au.currentTime||0,dur:isFinite(au.duration)&&au.duration?au.duration:(ti?ti.t.dur:0),
     volume:Math.round(au.volume*100),error:L.err,
-    track:ti&&{id:ti.t.id,title:ti.t.title,artist:ti.t.artist,album:ti.a.id,album_name:ti.t.radio?ti.t.country:ti.a.yt?"YouTube":ti.a.name,album_artist:ti.a.artist,
+    track:ti&&{id:ti.t.id,title:ti.t.title,artist:ti.t.artist,album:ti.a.id,album_name:ti.t.radio?ti.t.country:ti.a.name,album_artist:ti.a.artist,
       fmt:ti.t.fmt,q:ti.t.q,radio:!!ti.t.radio,live:""}};
 }
 const lshow=()=>{if(mode==="local")show(localStatus())};
@@ -104,17 +104,13 @@ function localPlay(queue,pos,t=0,autoplay=true){
 }
 function localStop(){hlsStop();au.pause();au.removeAttribute("src");au.load();L.pos=-1;lshow()}
 au.addEventListener("ended",()=>localPlay(L.queue,L.pos+1));
-au.addEventListener("error",async()=>{
+au.addEventListener("error",()=>{
   if(!au.getAttribute("src")||hlsPlayer)return;
   const q=L.queue,p=L.pos,tid=q[p],ti=trackById[tid];
   L.err=T("Este navegador não conseguiu tocar {what}",{what:(ti?.t.fmt||T("o arquivo"))+(ti?` (${ti.t.title})`:"")});
-  if(tid?.startsWith("yt_")){                // YouTube: the server knows why (yt-dlp error, "not a bot"...)
-    try{const r=await (await fetch("/api/yt_check?id="+encodeURIComponent(tid))).json();if(!r.ok&&r.error)L.err="YouTube: "+r.error}catch(e){}
-    if(L.queue!==q||L.pos!==p)return;
-  }
   lshow();
   L.fails=(L.fails||0)+1;
-  if(L.fails>=3)return;                      // don't run through a whole playlist when every track fails
+  if(L.fails>=3)return;                      // don't run through a whole album when every track fails
   setTimeout(()=>{if(L.err&&L.queue===q&&L.pos===p)localPlay(q,p+1)},2500);
 });
 au.addEventListener("playing",()=>{L.fails=0});

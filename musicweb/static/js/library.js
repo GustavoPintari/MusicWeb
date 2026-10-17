@@ -26,7 +26,6 @@ function render(){
 
 let editing=false;
 function renderSheet(){
-  if(openAlbum==="@yt"){setTint();return renderYT()}
   if(openAlbum==="@radio"){setTint();return renderRadio()}
   if(openAlbum==="@retro"){setTint();return renderRetro()}
   if(openAlbum==="@ly"){setTint();return renderLyrics()}

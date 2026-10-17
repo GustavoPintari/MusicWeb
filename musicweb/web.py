@@ -12,9 +12,8 @@ from .library import library_json, scan
 from .lyrics import get_lyrics
 from .player import mpv_cmd, pause, play_pos, resume, seek, status, stop
 from .retro import periods as retro_periods, retro
-from .state import albums, item, lock, state, tracks, yt_items, yt_playlists
-from .util import MIME, safe_name, sniff, zip_name
-from .youtube import pl_public, yt_add, yt_check, yt_direct, yt_remove
+from .state import albums, item, lock, state, tracks
+from .util import MIME, sniff, zip_name
 
 STATIC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
 STATIC_TYPES = {".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8"}
@@ -102,11 +101,6 @@ class H(BaseHTTPRequestHandler):
             self.send(json.dumps(cover_candidates(q.get("q", [""])[0])))
         elif p == "/api/lyrics":
             self.send(json.dumps(get_lyrics(q.get("id", [""])[0], q.get("artist", [""])[0], q.get("title", [""])[0])))
-        elif p == "/api/yt_check":
-            self.send(json.dumps(yt_check(q.get("id", [""])[0])))
-        elif p == "/api/yt_playlist":
-            pl = yt_playlists.get(q.get("id", [""])[0])
-            self.send(json.dumps(pl_public(pl, entries=True) if pl else {"error": _("não encontrado")}), code=200 if pl else 404)
         elif p == "/api/retro":
             period = q.get("period", [""])[0]
             self.send(json.dumps(retro(period) if period else retro_periods()))
@@ -118,8 +112,6 @@ class H(BaseHTTPRequestHandler):
             except ValueError:
                 days = 0
             self.send(json.dumps(stats(days)))
-        elif p.startswith("/api/stream/yt_"):
-            self.yt_stream(p.rsplit("/", 1)[1], "dl" in q)
         elif p.startswith("/api/stream/"):
             self.stream(p.rsplit("/", 1)[1], "dl" in q)
         elif p.startswith("/api/download/"):
@@ -194,55 +186,6 @@ class H(BaseHTTPRequestHandler):
             return self.send(json.dumps({"error": _("Não consegui falar com o Radio Browser")}), code=502)
         self.send(json.dumps(data))
 
-    def yt_stream(self, tid, attachment=False):
-        """Relays the YouTube audio (with Range, so seeking works)."""
-        if tid not in yt_items:
-            return self.send("{}", code=404)
-        r = None
-        for attempt in range(2):                     # 2nd attempt asks for a new link (the old one expired)
-            try:
-                url, headers, _fetched = yt_direct(tid, force=attempt > 0)
-            except Exception as e:
-                return self.send(json.dumps({"error": str(e)}), code=502)
-            h = dict(headers)
-            if self.headers.get("Range"):
-                h["Range"] = self.headers["Range"]
-            try:
-                r = urllib.request.urlopen(urllib.request.Request(url, headers=h), timeout=20)
-                break
-            except urllib.error.HTTPError as e:
-                if e.code == 416:
-                    self.send_response(416)
-                    if e.headers.get("Content-Range"):
-                        self.send_header("Content-Range", e.headers["Content-Range"])
-                    self.end_headers()
-                    return
-                if attempt == 1:
-                    return self.send("{}", code=502)
-            except Exception:
-                if attempt == 1:
-                    return self.send("{}", code=502)
-        with r:
-            ctype = r.headers.get("Content-Type", "audio/mp4")
-            self.send_response(r.status)
-            self.send_header("Content-Type", ctype)
-            for k in ("Content-Length", "Content-Range"):
-                if r.headers.get(k):
-                    self.send_header(k, r.headers[k])
-            self.send_header("Accept-Ranges", "bytes")
-            if attachment:
-                fname = safe_name(yt_items[tid]["title"]) + (".webm" if "webm" in ctype else ".m4a")
-                self.send_header("Content-Disposition", "attachment; filename*=UTF-8''" + urllib.parse.quote(fname))
-            self.end_headers()
-            try:
-                while True:
-                    chunk = r.read(65536)
-                    if not chunk:
-                        break
-                    self.wfile.write(chunk)
-            except OSError:
-                pass                                 # the browser/mpv cancelled (normal when seeking)
-
     def download(self, aid):
         with lock:
             a = albums.get(aid)
@@ -293,15 +236,12 @@ class H(BaseHTTPRequestHandler):
                 elif body.get("id") in tracks:
                     queue = albums[tracks[body["id"]]["album"]]["tracks"]
                     pos = queue.index(body["id"])
-                elif body.get("playlist") in yt_playlists:      # YouTube playlist, optionally from a given video
-                    queue = yt_playlists[body["playlist"]]["entries"]
-                    pos = min(max(int(body.get("pos") or 0), 0), len(queue) - 1)
                 elif isinstance(body.get("queue"), list) and body["queue"]:   # any list of known ids
                     queue = [i for i in body["queue"] if item(i)]
                     pos = min(max(int(body.get("pos") or 0), 0), max(len(queue) - 1, 0))
                     if not queue:
                         return self.send(json.dumps({"error": _("não encontrado")}), code=404)
-                elif item(body.get("id")):                       # YouTube video or radio station
+                elif item(body.get("id")):                       # radio station
                     queue, pos = [body["id"]], 0
                 else:
                     return self.send(json.dumps({"error": _("não encontrado")}), code=404)
@@ -357,10 +297,6 @@ class H(BaseHTTPRequestHandler):
                 return self.send(json.dumps({"ok": False, "error": str(e)}))
         elif p == "/api/delete":
             return self.send(json.dumps(remove_album(body.get("album", ""), bool(body.get("permanent")))))
-        elif p == "/api/yt":
-            return self.send(json.dumps(yt_add(body.get("url", ""))))
-        elif p == "/api/yt_remove":
-            return self.send(json.dumps(yt_remove(body.get("id", ""))))
         else:
             return self.send("{}", code=404)
         self.send(json.dumps(status()))

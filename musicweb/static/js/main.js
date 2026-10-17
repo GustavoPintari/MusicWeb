@@ -24,12 +24,10 @@ $("#back").onclick=()=>history.back();
 $("#sheet").addEventListener("scroll",e=>e.target.classList.toggle("scrolled",e.target.scrollTop>4),{passive:true});
 window.onpopstate=closeSheet;
 $("#sheetBody").onclick=e=>{
-  const x=e.target.closest("[data-x]");if(x){removeYT(x.dataset.x);return}
   const fv=e.target.closest("[data-fav]");if(fv){toggleFav(fv.dataset.fav,fv);return}
   const rr=e.target.closest(".rr");if(rr){playRadio(rr.dataset.r,rr);return}
   const tg=e.target.closest("[data-tag]");if(tg){R.tag=R.tag===tg.dataset.tag?"":tg.dataset.tag;
     document.querySelectorAll("[data-tag]").forEach(b=>b.classList.toggle("on",b.dataset.tag===R.tag));radioSearch();return}
-  const pl=e.target.closest("[data-pl]");if(pl){pl.classList.add("busy");playPlaylist({id:pl.dataset.pl}).catch(err=>toast(err.message,6000)).finally(()=>pl.classList.remove("busy"));return}
   const hh=e.target.closest(".hr[data-h]");if(hh){playFromHistory(hh.dataset.h,hh);return}
   if(e.target.closest("#lyre")){e.preventDefault();const w=$("#lyfw");w.hidden=!w.hidden;if(!w.hidden)w.scrollIntoView({behavior:"smooth",block:"center"});return}
   const lp=e.target.closest(".ly p[data-i]");if(lp&&S.track?.id===LY.tid){ctl.seek(LY.lines[+lp.dataset.i].t);lyUserScroll=0;return}
@@ -52,13 +50,11 @@ $("#sheetBody").onchange=e=>{
 };
 $("#sheetBody").onsubmit=e=>{
   if(e.target.id==="csf"){e.preventDefault();searchCovers()}
-  if(e.target.id==="ytf"){e.preventDefault();playYT()}
   if(e.target.id==="rdf"){e.preventDefault();radioSearch()}
   if(e.target.id==="lyf"){e.preventDefault();e.target.querySelector("button").classList.add("busy");
     fetchLyrics(LY.tid,$("#lya").value.trim(),$("#lyt").value.trim())}
 };
-$("#now").onclick=()=>{if(S.track&&!$("#sheet").classList.contains("open"))openSheet(byId[S.track.album]?S.track.album:S.track.radio?"@radio":"@yt")};
-$("#ytb").onclick=()=>{openSheet("@yt");$("#ytu").focus()};
+$("#now").onclick=()=>{if(S.track&&!$("#sheet").classList.contains("open"))openSheet(byId[S.track.album]?S.track.album:"@radio")};
 $("#rdb").onclick=()=>openSheet("@radio");
 $("#lyb").onclick=()=>{navigator.vibrate?.(10);if(openAlbum==="@ly")history.back();else openSheet("@ly")};
 $("#pp").onclick=e=>ctl.toggle(e.currentTarget);
@@ -83,9 +79,6 @@ async function load(){
   lib=d.albums;byId={};trackById={};playerName=d.player||"Receiver";renderOut();
   historyOn=d.history!==false;playMin=d.play_min||30;
   lib.forEach(a=>{byId[a.id]=a;a.tracks.forEach(t=>trackById[t.id]={t,a})});
-  const vids=(d.yt||[]).filter(y=>!y.playlist);
-  vids.forEach(y=>ytKnown[y.id]=y);Object.values(ytKnown).forEach(regYT);   // keep what is playing even if it left the history
-  ytList=(d.yt||[]).map(y=>y.playlist?y:trackById[y.id].a);
   Object.values(radioKnown).forEach(regRadio);
   loadRadios();render();if(openAlbum&&!editing)renderSheet();   // don't wipe a form being edited
 }

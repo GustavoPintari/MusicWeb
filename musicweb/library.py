@@ -11,7 +11,6 @@ from .covers import cover_ver
 from .i18n import name
 from .state import albums, lock, state, tracks
 from .util import EXTS, clean_album, mutagen, num, sid
-from .youtube import history_public
 
 
 DISC_DIR = re.compile(r"^(cd|disc|disk|disco)\s*\d+", re.I)
@@ -170,8 +169,7 @@ def library_json():
                         "cv": cover_ver.get(a["id"], 0),
                         "tracks": [{k: tracks[i][k] for k in ("id", "title", "artist", "n", "disc", "dur", "fmt", "q")}
                                    for i in a["tracks"]]})
-    yt = history_public()                     # takes the lock itself
-    return json.dumps({"api": 2, "lib": state["lib"], "player": cfg.player_name, "albums": out, "yt": yt,
+    return json.dumps({"api": 2, "lib": state["lib"], "player": cfg.player_name, "albums": out,
                        "history": cfg.history_enabled, "play_min": cfg.history_min_seconds})
 
 

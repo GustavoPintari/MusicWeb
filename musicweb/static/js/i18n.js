@@ -6,7 +6,7 @@
 const LANG=document.documentElement.lang.toLowerCase().startsWith("en")?"en":"pt-BR",LOC=LANG==="en"?"en-US":"pt-BR";
 const EN={
   "Buscar álbum, artista ou faixa…":"Search albums, artists or tracks…","Álbuns":"Albums","Artistas":"Artists","Tocadas":"Played",
-  "Tocar do YouTube":"Play from YouTube","Reescanear biblioteca":"Rescan library","‹ Voltar":"‹ Back","Letra da música":"Lyrics",
+  "Reescanear biblioteca":"Rescan library","‹ Voltar":"‹ Back","Letra da música":"Lyrics",
   "Anterior":"Previous","Tocar/Pausar":"Play/Pause","Próxima":"Next","Volume":"Volume","Parar":"Stop","Diminuir volume":"Volume down","Aumentar volume":"Volume up",
   "Sem conexão com o servidor":"No connection to the server","Erro na página: ":"Page error: ",
   "Nada encontrado":"Nothing found","Nenhuma música encontrada":"No music found","álbum":"album","álbuns":"albums","faixa":"track","faixas":"tracks","{n} faixas":"{n} tracks",
@@ -19,8 +19,6 @@ const EN={
   "Os arquivos vão para a lixeira e podem ser recuperados.":"The files go to the trash and can be recovered.",
   "Apagar definitivamente (não dá para desfazer)":"Delete permanently (cannot be undone)",
   "O nome do álbum não pode ficar vazio.":"The album name can't be empty.","Algumas alterações falharam:":"Some changes failed:",
-  "Cole o link de um vídeo para tocar só o áudio.":"Paste a video link to play only its audio.","Tocar":"Play","Tocados recentemente":"Recently played",
-  "Tirar do histórico":"Remove from history","Não consegui abrir esse vídeo":"Couldn't open this video",
   "agora":"now","há {n} min":"{n} min ago","hoje {hm}":"today {hm}","ontem {hm}":"yesterday {hm}","Não está mais na biblioteca":"No longer in the library",
   "Carregando…":"Loading…","O histórico está desligado ([history] enabled no config.toml).":"History is turned off ([history] enabled in config.toml).",
   "7 dias":"7 days","30 dias":"30 days","Sempre":"All time","reprodução":"play","reproduções":"plays","Nada tocado ainda.":"Nothing played yet.",
@@ -44,8 +42,6 @@ const EN={
   "Resultados":"Results","Mais populares":"Most popular","Nenhuma rádio encontrada.":"No stations found.","Tirar dos favoritos":"Remove from favorites",
   "Favoritar":"Add to favorites","Adicionada aos favoritos":"Added to favorites","Removida dos favoritos":"Removed from favorites",
   "AO VIVO":"LIVE","Rádio ao vivo":"Live radio","Esta rádio não informa a música que está tocando.":"This station doesn't say which song is playing.",
-  "Cole o link de um vídeo ou de uma playlist para tocar só o áudio.":"Paste a video or playlist link to play only the audio.",
-  "Playlist · {n} vídeos":"Playlist · {n} videos","Não consegui abrir essa playlist":"Couldn't open this playlist",
   "Retrospectiva":"Recap","Período":"Period","Meses":"Months","Anos":"Years","ouvindo música":"listening to music","músicas diferentes":"different tracks",
   "artistas":"artists","dias com música":"days with music","dias seguidos (recorde)":"days in a row (record)","artistas novos":"new artists",
   "artista":"artist","dia com música":"day with music","dia seguido (recorde)":"day in a row (record)","artista novo":"new artist","música diferente":"different track",

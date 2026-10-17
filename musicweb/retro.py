@@ -7,7 +7,7 @@ from collections import Counter
 
 from . import db
 from .i18n import name
-from .state import lock, tracks, yt_items
+from .state import lock, tracks
 
 
 def periods():
@@ -37,7 +37,7 @@ def _bounds(period):
 def _cover(tid):
     with lock:
         t = tracks.get(tid)
-        return t["album"] if t else (tid if tid in yt_items else None)
+        return t["album"] if t else None
 
 
 def _dur(tid, dur):
@@ -45,7 +45,7 @@ def _dur(tid, dur):
     if dur:
         return dur
     with lock:
-        it = tracks.get(tid) or yt_items.get(tid)
+        it = tracks.get(tid)
     return it["dur"] if it else 0
 
 
@@ -77,7 +77,7 @@ def retro(period):
             by_artist[key] += 1
             artist_secs[key] += d
             info.setdefault(("artist", key), artist)
-        if album and album != "YouTube":
+        if album and album != "YouTube":            # plays of YouTube videos (removed feature) have no album
             by_album[(album, artist)] += 1
             album_cover.setdefault((album, artist), _cover(tid))
     # longest run of consecutive days with music
@@ -90,7 +90,7 @@ def retro(period):
     for tid, n in by_track.most_common(5):
         title, artist, album = info[tid]
         with lock:
-            available = tid in tracks or tid in yt_items
+            available = tid in tracks
         top_tracks.append({"id": tid, "title": title, "artist": name(artist), "album": name(album), "count": n,
                            "cover": _cover(tid), "available": available})
     return {

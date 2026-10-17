@@ -23,18 +23,15 @@ FILE_KEYS = {
     ("mpv", "replaygain"): ("mpv_replaygain", str),
     ("covers", "online"): ("covers_online", bool),
     ("lyrics", "online"): ("lyrics_online", bool),
-    ("youtube", "cookies"): ("yt_cookies", str),
-    ("youtube", "max_history"): ("yt_max_history", int),
-    ("youtube", "format"): ("yt_format", str),
-    ("youtube", "playlist_max"): ("yt_playlist_max", int),
-    ("youtube", "pot_server"): ("yt_pot_server", str),
-    ("youtube", "pot_url"): ("yt_pot_url", str),
     ("cache", "dir"): ("cache_dir", str),
     ("data", "dir"): ("data_dir", str),
     ("history", "enabled"): ("history_enabled", bool),
     ("history", "min_seconds"): ("history_min_seconds", int),
     ("player", "resume_on_start"): ("resume_on_start", bool),
 }
+
+# sections of older versions, ignored with a note instead of a warning per option
+REMOVED_SECTIONS = {"youtube": "o YouTube foi removido"}
 
 # accepted environment variables (the older ones keep working)
 ENV_KEYS = {
@@ -43,7 +40,6 @@ ENV_KEYS = {
     "LYRICS_ONLINE": ("lyrics_online", bool),
     "RESCAN_EVERY": ("rescan_every", int),
     "PLAYER_NAME": ("player_name", str),
-    "YT_COOKIES": ("yt_cookies", str),
     "TRASH": ("trash_dir", str),
     "MUSIC_DIR": ("music_dir", str),
     "MUSICWEB_LANGUAGE": ("language", str),
@@ -74,13 +70,7 @@ class Config:
     mpv_replaygain: str = "album"            # volume leveling from ReplayGain tags: "album", "track" or "no"
     covers_online: bool = True               # look up covers on iTunes / MusicBrainz
     lyrics_online: bool = True               # look up lyrics on LRCLIB
-    yt_cookies: str = ""                     # cookies.txt, if YouTube asks to sign in
-    yt_max_history: int = 50
-    yt_playlist_max: int = 200               # videos read from a playlist link
-    yt_format: str = "bestaudio[ext=m4a]/bestaudio[acodec^=mp4a]/bestaudio/best"   # m4a plays in every browser
-    yt_pot_server: str = "~/bgutil-ytdlp-pot-provider/server"   # PO token server started with MusicWeb; "" = don't start
-    yt_pot_url: str = "http://127.0.0.1:4416"   # where the PO token server answers
-    cache_dir: str = "~/.cache/musicweb"     # disposable: covers, lyrics, YouTube history
+    cache_dir: str = "~/.cache/musicweb"     # disposable: covers and lyrics
     data_dir: str = "~/.local/share/musicweb"   # kept: SQLite database (scan cache, play history, queue)
     history_enabled: bool = True             # record plays for history / most played
     history_min_seconds: int = 30            # listening time before a track counts as played
@@ -99,7 +89,7 @@ class Config:
 
     @property
     def local_host(self):
-        """Address mpv uses to reach this server (to play YouTube)."""
+        """Address this server answers on locally (used by `musicweb.sh status`)."""
         return self.host if self.host not in ("", "0.0.0.0", "::") else "127.0.0.1"
 
     @property
@@ -113,10 +103,6 @@ class Config:
     @property
     def lyrics_dir(self):
         return os.path.join(self.cache, "lyrics")
-
-    @property
-    def yt_history_file(self):
-        return os.path.join(self.cache, "youtube.json")
 
     @property
     def db_file(self):
@@ -162,6 +148,9 @@ class Config:
         except tomllib.TOMLDecodeError as e:
             raise SystemExit(f"Erro no arquivo de configuração {path}: {e}")
         for section, values in data.items():
+            if section in REMOVED_SECTIONS:
+                print(f"[config] a seção [{section}] não é mais usada ({REMOVED_SECTIONS[section]}); pode apagá-la")
+                continue
             if not isinstance(values, dict):
                 print(f"[config] ignorando '{section}': esperava uma seção [{section}]")
                 continue
