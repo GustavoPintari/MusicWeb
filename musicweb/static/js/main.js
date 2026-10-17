@@ -20,8 +20,6 @@ function openSheet(id){
 }
 function closeSheet(){$("#sheet").classList.remove("open");openAlbum=null;editing=false;$("#lyb").classList.remove("on");setTint()}
 $("#back").onclick=()=>history.back();
-$("#bgsw").onclick=e=>{const b=e.target.closest("button");if(b){navigator.vibrate?.(10);setAlbumBg(b.dataset.bg)}};
-setAlbumBg(albumBg);addEventListener("resize",grooveCenter);
 $("#sheet").addEventListener("scroll",e=>e.target.classList.toggle("scrolled",e.target.scrollTop>4),{passive:true});
 window.onpopstate=closeSheet;
 $("#sheetBody").onclick=e=>{

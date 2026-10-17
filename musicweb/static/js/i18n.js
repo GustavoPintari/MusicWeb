@@ -6,7 +6,7 @@
 const LANG=document.documentElement.lang.toLowerCase().startsWith("en")?"en":"pt-BR",LOC=LANG==="en"?"en-US":"pt-BR";
 const EN={
   "Buscar álbum, artista ou faixa…":"Search albums, artists or tracks…","Álbuns":"Albums","Artistas":"Artists","Tocadas":"Played",
-  "Tocar do YouTube":"Play from YouTube","Reescanear biblioteca":"Rescan library","‹ Voltar":"‹ Back","Vidro":"Glass","Vinil":"Vinyl","Fundo da página do álbum":"Album page background","Letra da música":"Lyrics",
+  "Tocar do YouTube":"Play from YouTube","Reescanear biblioteca":"Rescan library","‹ Voltar":"‹ Back","Letra da música":"Lyrics",
   "Anterior":"Previous","Tocar/Pausar":"Play/Pause","Próxima":"Next","Volume":"Volume","Parar":"Stop","Diminuir volume":"Volume down","Aumentar volume":"Volume up",
   "Sem conexão com o servidor":"No connection to the server","Erro na página: ":"Page error: ",
   "Nada encontrado":"Nothing found","Nenhuma música encontrada":"No music found","álbum":"album","álbuns":"albums","faixa":"track","faixas":"tracks","{n} faixas":"{n} tracks",
