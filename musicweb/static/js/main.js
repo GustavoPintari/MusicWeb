@@ -4,6 +4,7 @@
 // events
 document.querySelector(".seg").onclick=e=>{const b=e.target.closest("button");if(!b)return;view=b.dataset.v;try{localStorage.setItem("view",view)}catch(e){};if(view==="plays")P.data=null;render()};
 $("#q").oninput=render;
+addEventListener("scroll",()=>document.body.classList.toggle("scrolled",scrollY>4),{passive:true});
 $("#lib").onclick=e=>{
   if(e.target.closest("#rtb")){openSheet("@retro");return}
   const pd=e.target.closest(".per button");if(pd){P.days=+pd.dataset.days;try{localStorage.setItem("pdays",P.days)}catch(e){};P.data=null;renderPlays();return}

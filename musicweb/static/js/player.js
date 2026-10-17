@@ -19,6 +19,7 @@ function show(s){
     const a=s.track&&(byId[s.track.album]||trackById[s.track.id]?.a);
     $("#now").innerHTML=s.track?`${cover(a||{id:s.track.album,name:s.track.album_name,artist:""},"",true)}<div class="tx"><b>${esc(s.track.title)}</b><small>${nowSub(s.track)}</small></div>`:`<div class="tx"><small>${T("Nada tocando")}</small></div>`;
     document.title=s.track?`${s.track.title} - MusicWeb`:"MusicWeb";
+    setHomeTheme(s.track);
     $("#nowfmt").innerHTML=s.track?fmtBadge(s.track.fmt,s.track.q):"";
     if(mode==="local")mediaMeta();
     if(openAlbum==="@ly")renderLyrics();
