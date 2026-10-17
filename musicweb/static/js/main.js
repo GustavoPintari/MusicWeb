@@ -65,7 +65,7 @@ $("#rs").onclick=async e=>{const b=e.currentTarget;await api("rescan",null,b);b.
 
 let volDragging=false,volTimer=null;
 $("#vol").onclick=e=>{navigator.vibrate?.(10);$("#volpop").classList.toggle("open");e.currentTarget.classList.toggle("on");fitBar()};
-$("#vr").oninput=e=>{volDragging=true;const v=+e.target.value;$("#vl").textContent=v+"%";
+$("#vr").oninput=e=>{volDragging=true;const v=+e.target.value;volSet(v);
   clearTimeout(volTimer);volTimer=setTimeout(()=>ctl.volume(v).finally(()=>volDragging=false),120)};
 $("#vdn").onclick=e=>ctl.volDelta(-5,e.currentTarget);
 $("#vup").onclick=e=>ctl.volDelta(5,e.currentTarget);
