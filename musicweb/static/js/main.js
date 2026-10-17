@@ -62,8 +62,6 @@ $("#nx").onclick=e=>ctl.next(e.currentTarget);
 $("#pv").onclick=e=>ctl.prev(e.currentTarget);
 $("#st").onclick=e=>ctl.stop(e.currentTarget);
 $("#rs").onclick=async e=>{const b=e.currentTarget;await api("rescan",null,b);b.classList.add("busy");await load();b.classList.remove("busy")};
-$("#prog").onclick=e=>{if(!S.dur||!S.track)return;const r=e.currentTarget.getBoundingClientRect(),t=(e.clientX-r.left)/r.width*S.dur;
-  ctl.seek(t)};
 
 let volDragging=false,volTimer=null;
 $("#vol").onclick=e=>{navigator.vibrate?.(10);$("#volpop").classList.toggle("open");e.currentTarget.classList.toggle("on");fitBar()};

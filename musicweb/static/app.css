@@ -146,16 +146,32 @@ a.btn2:active{transform:scale(.92);filter:brightness(1.35)}
 #pg{display:flex;align-items:center;gap:8px;color:var(--mut);font-size:12px;font-variant-numeric:tabular-nums}
 #pg span{min-width:34px}#pg span:last-child{text-align:right}
 #prog{position:relative;flex:1;height:20px;cursor:pointer;display:flex;align-items:center;touch-action:none}
-#prog .tr{height:4px;width:100%;background:#ffffff26;border-radius:2px;overflow:hidden;transition:height .15s}
-#prog:hover .tr{height:6px}
-#prog .fl{height:100%;width:0;background:var(--ac)}
+#prog .tr{height:4px;width:100%;background:#ffffff26;border-radius:2px;overflow:hidden;transition:height .15s;
+  transform:scaleY(calc(1 + var(--kick,0) * .9))}                /* --kick: the beat, set by viz.js */
+#prog:hover .tr,#prog.drag .tr{height:6px}
+#prog .fl{position:relative;height:100%;width:0;background:var(--ac);overflow:hidden}
+/* a highlight that runs along the part already played, only while playing */
+#prog .fl::after{content:"";position:absolute;top:0;bottom:0;left:-70px;width:70px;opacity:0;
+  background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--ac),#fff 60%),transparent)}
+#bar.playing #prog .fl::after{opacity:.8;animation:shine 2.8s ease-in-out infinite}
+@keyframes shine{0%{left:-70px}70%,100%{left:100%}}
+#prog .th{position:absolute;left:0;top:50%;width:13px;height:13px;margin:-6.5px 0 0 -6.5px;border-radius:50%;background:#fff;
+  box-shadow:0 0 8px color-mix(in srgb,var(--ac) 70%,transparent);transform:scale(0);transition:transform .15s;pointer-events:none}
+#prog:hover .th,#prog.drag .th{transform:scale(1)}
+#prog .tip{position:absolute;bottom:100%;left:0;transform:translateX(-50%);background:#2a2a2a;color:var(--fg);font-size:11px;
+  padding:2px 6px;border-radius:4px;pointer-events:none;opacity:0;transition:opacity .15s;white-space:nowrap}
+#prog.tipon .tip{opacity:1}
+/* aurora: album colors that breathe with the music, behind the frosted glass; it rises a bit above the bar and fades out */
+#aura{position:absolute;left:0;right:0;bottom:0;width:100%;height:calc(100% + 70px);pointer-events:none;
+  -webkit-mask-image:linear-gradient(to top,#000 calc(100% - 70px),transparent);mask-image:linear-gradient(to top,#000 calc(100% - 70px),transparent)}
+#bar>:not(#aura){position:relative}
 .pl{display:flex;align-items:center;gap:10px}
 #now{display:flex;align-items:center;gap:10px;flex:1;min-width:0;cursor:pointer}
 #now .cv{width:46px;flex:none;font-size:16px;border-radius:6px}
 #now .tx{min-width:0}
 #now .tx b,#now .tx small{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #now .tx small{color:var(--mut);font-size:13px}
-.ctl{display:flex;gap:6px}
+.ctl{display:flex;align-items:center;gap:6px}
 .ctl button{width:42px;height:42px;padding:0;display:grid;place-items:center;border-radius:50%;background:#ffffff14}
 #volpop button{background:#ffffff14}
 #pp{background:var(--fg);color:#000;width:48px;height:48px}
