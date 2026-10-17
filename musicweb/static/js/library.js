@@ -41,7 +41,7 @@ function renderSheet(){
       <div class="acts"><button class="big" id="playAll">${PLAY} ${T("Tocar álbum")}</button><a class="btn2" id="dlAlbum" href="/api/download/${a.id}" download>${T("Baixar")}</a><button id="editAlbum">${T("Editar")}</button></div></div></div>`+
     a.tracks.map(t=>{const d=discs&&t.disc!==lastDisc?`<div class="disc">${T("Disco {n}",{n:t.disc})}</div>`:"";lastDisc=t.disc;
       return d+`<div class="t" data-t="${t.id}"><span class="n">${t.n||""}</span><span class="ti">${esc(t.title)}${t.artist&&t.artist!==a.artist?`<small>${esc(t.artist)}</small>`:""}</span>${af.mixed?fmtBadge(t.fmt):""}<span class="d">${t.dur?fmt(t.dur):""}</span></div>`}).join("");
-  markPlaying();grooveCenter();
+  markPlaying();
 }
 
 function renderEdit(a){

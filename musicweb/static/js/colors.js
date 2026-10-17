@@ -1,4 +1,4 @@
-// Album colors taken from the cover, and the album page background (glass / vinyl).
+// Album colors taken from the cover, and the album page background (the blurred cover).
 // Plain script (no modules): the files share one global scope and load in order (see index.html).
 
 // ---------- album colors from the cover: up to three strong hues (for a gradient of color "patches"),
@@ -35,12 +35,11 @@ function coverColors(d){                    // d: RGBA pixels of the cover, scal
   const dark=([h,s])=>`hsl(${Math.round(h)} ${Math.round(cl(s*1.1,.45,.8)*100)}% ${h>=40&&h<=75?24:28}%)`;   // yellows look brighter
   const cs=ks.map(k=>dark(hueOf(k))),[h,s]=hueOf(ks[0]);
   return {bg:cs[0],bg2:cs[1]||cs[0],bg3:cs[2]||cs[1]||cs[0],
-    vbg:`hsl(${Math.round(h)} ${Math.round(cl(s,.35,.6)*100)}% 20%)`,groove:`hsl(${Math.round(h)} ${Math.round(cl(s*1.2,.5,.85)*100)}% 55%)`,
     ac:`hsl(${Math.round(h)} ${Math.round(cl(s,.6,.9)*100)}% ${h>=200&&h<=280?72:64}%)`};
 }
 function albumTint(a){
   if(tintCache[a.id])return Promise.resolve(tintCache[a.id]);
-  const ph=`hsl(${hue((a.name||"")+(a.artist||""))} 35% 26%)`,gray={bg:"hsl(0 0% 17%)",bg2:"hsl(0 0% 17%)",bg3:"hsl(0 0% 17%)",vbg:"#1b1b1d",groove:"#8a8a8a",ac:""};
+  const ph=`hsl(${hue((a.name||"")+(a.artist||""))} 35% 26%)`,gray={bg:"hsl(0 0% 17%)",bg2:"hsl(0 0% 17%)",bg3:"hsl(0 0% 17%)",ac:""};
   return new Promise(res=>{
     const img=new Image();
     img.onload=()=>{
@@ -48,9 +47,9 @@ function albumTint(a){
         const c=document.createElement("canvas");c.width=c.height=48;
         const x=c.getContext("2d");x.drawImage(img,0,0,48,48);
         res(tintCache[a.id]=coverColors(x.getImageData(0,0,48,48).data)||gray);
-      }catch(e){res(tintCache[a.id]={bg:ph,bg2:ph,bg3:ph,vbg:ph,groove:"#8a8a8a",ac:""})}
+      }catch(e){res(tintCache[a.id]={bg:ph,bg2:ph,bg3:ph,ac:""})}
     };
-    img.onerror=()=>res(tintCache[a.id]={bg:ph,bg2:ph,bg3:ph,vbg:ph,groove:"#8a8a8a",ac:""});   // same hue as the placeholder cover
+    img.onerror=()=>res(tintCache[a.id]={bg:ph,bg2:ph,bg3:ph,ac:""});   // same hue as the placeholder cover
     img.src=`/api/cover/${a.id}?v=${a.cv||0}`;
   });
 }
@@ -58,32 +57,16 @@ function paint(el,c,pre){                   // c.ac is empty for gray covers: ke
   el.style.setProperty(`--${pre}`,c.bg);el.style.setProperty(`--${pre}2`,c.bg2);el.style.setProperty(`--${pre}3`,c.bg3);
   if(c.ac)el.style.setProperty("--ac",c.ac);else el.style.removeProperty("--ac");
 }
-// key: which sheet asked, so a late answer can't tint another one. The player bar takes the same colors,
-// so the album page looks like one piece; everywhere else both stay neutral.
+// key: which sheet asked, so a late answer can't tint another one. The player bar (frosted glass on every
+// page) takes the album's accent while its page is open; everywhere else both stay neutral.
 function setTint(key,a){
   const sh=$("#sheet"),bar=$("#bar"),meta=document.querySelector('meta[name="theme-color"]');
-  sh.classList.toggle("isalbum",!!a);
-  if(!a){for(const el of [sh,bar]){el.classList.remove("tinted");el.style.removeProperty("--ac")}meta.content="#121212";return}
+  if(!a){sh.classList.remove("tinted");for(const el of [sh,bar])el.style.removeProperty("--ac");meta.content="#121212";return}
   albumTint(a).then(c=>{
     if(openAlbum!==key)return;
-    paint(sh,c,"tint");paint(bar,c,"btint");
-    sh.style.setProperty("--vbg",c.vbg);sh.style.setProperty("--groove",c.groove);
+    paint(sh,c,"tint");
+    if(c.ac)bar.style.setProperty("--ac",c.ac);else bar.style.removeProperty("--ac");
     sh.style.setProperty("--cvurl",`url("/api/cover/${a.id}?v=${a.cv||0}")`);
-    sh.classList.add("tinted");bar.classList.add("tinted");meta.content=albumBg==="vinyl"?c.vbg:c.bg;
+    sh.classList.add("tinted");meta.content=c.bg;
   });
-}
-
-
-let albumBg="glass";try{albumBg=localStorage.getItem("albumbg")==="vinyl"?"vinyl":"glass"}catch(e){}
-function setAlbumBg(v){
-  albumBg=v;$("#sheet").dataset.bg=v;
-  document.querySelectorAll("#bgsw button").forEach(b=>b.classList.toggle("on",b.dataset.bg===v));
-  try{localStorage.setItem("albumbg",v)}catch(e){}
-  grooveCenter();
-}
-function grooveCenter(){                    // the vinyl grooves come out from the middle of the album cover
-  const sh=$("#sheet"),cv=sh.querySelector(".hero .cv");if(!cv)return;
-  const r=cv.getBoundingClientRect(),o=sh.getBoundingClientRect();
-  sh.style.setProperty("--gx",Math.round(r.left-o.left+r.width/2)+"px");
-  sh.style.setProperty("--gy",Math.round(r.top-o.top+sh.scrollTop+r.height/2)+"px");
 }
