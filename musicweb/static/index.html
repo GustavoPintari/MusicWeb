@@ -60,16 +60,31 @@ header{position:sticky;top:0;z-index:5;background:var(--bg);padding:12px 0 10px;
 #sheet{position:fixed;inset:0;z-index:10;background:var(--bg);overflow-y:auto;padding:0 16px calc(var(--barh,150px) + 24px);
   transform:translateY(100%);transition:transform .25s ease;visibility:hidden}
 #sheet.open{transform:none;visibility:visible}
-#sheet .top{position:sticky;top:0;background:transparent;margin:0 -16px;padding:12px 16px;z-index:2;transition:background .3s,box-shadow .3s}
+#sheet .top{position:sticky;top:0;background:transparent;margin:0 -16px;padding:12px 16px;z-index:2;transition:background .3s,box-shadow .3s;
+  display:flex;align-items:center;justify-content:space-between;gap:8px}
 #sheet.scrolled .top{background:var(--bg);box-shadow:0 4px 14px #0006}
-/* album color: a gradient from the cover's dominant color behind the top of the sheet */
-#sheet::before{content:"";position:absolute;left:0;right:0;top:0;height:560px;pointer-events:none;z-index:0;opacity:0;
-  background:linear-gradient(180deg,transparent 25%,var(--bg) 90%),
-    radial-gradient(circle at 0% 0%,var(--tint) 0,transparent 65%),radial-gradient(circle at 100% 0%,var(--tint2) 0,transparent 60%),
-    radial-gradient(circle at 50% 55%,var(--tint3) 0,transparent 55%),var(--tint,transparent);transition:opacity .45s}
-#sheet.tinted::before{opacity:1}
-#sheet.tinted.scrolled .top{background:linear-gradient(105deg,var(--tint) 25%,var(--tint2))}
-#sheet>*{position:relative;z-index:1}#sheet>.top{z-index:2}
+/* album page background, two styles the viewer switches between (remembered on the device):
+   "glass": the cover itself, enlarged and blurred, with the header on a frosted glass panel;
+   "vinyl": a dark background in the cover's color with grooves coming out from behind the cover, like a record */
+#sbg{position:absolute;left:0;right:0;top:0;height:600px;overflow:hidden;pointer-events:none;opacity:0;transition:opacity .45s}
+#sbg i{position:absolute;inset:0}
+#sbg::after{content:"";position:absolute;inset:0}
+#sheet.tinted #sbg{opacity:1}
+#sheet[data-bg="glass"] #sbg i{background:var(--cvurl,none) center/cover var(--tint);transform:scale(1.4);filter:blur(50px) saturate(1.6) brightness(.85)}
+#sheet[data-bg="glass"] #sbg::after{background:linear-gradient(180deg,transparent 35%,var(--bg) 92%)}
+#sheet.tinted[data-bg="glass"] .hero{padding:16px;border-radius:16px;background:#12121280;border:1px solid #ffffff1a;
+  -webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px)}
+#sheet.tinted.scrolled[data-bg="glass"] .top{background:#12121299;-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px)}
+#sheet[data-bg="vinyl"] #sbg i{
+  background:repeating-radial-gradient(circle at var(--gx,126px) var(--gy,172px),transparent 0 5px,color-mix(in srgb,var(--groove) 22%,transparent) 5px 6px),
+    radial-gradient(circle at var(--gx,126px) var(--gy,172px),color-mix(in srgb,var(--groove) 35%,transparent),transparent 70%),var(--vbg);
+  -webkit-mask-image:linear-gradient(180deg,#000 45%,transparent 95%);mask-image:linear-gradient(180deg,#000 45%,transparent 95%)}
+#sheet.tinted.scrolled[data-bg="vinyl"] .top{background:var(--vbg)}
+.bgsw{display:none;background:#0006;border-radius:10px;padding:3px}
+#sheet.isalbum .bgsw{display:flex}
+.bgsw button{background:none;padding:6px 11px;border-radius:8px;color:var(--mut);font-size:13px}
+.bgsw button.on{background:#ffffff1f;color:var(--fg)}
+#sheet>*{position:relative;z-index:1}#sheet>.top{z-index:2}#sheet>#sbg{position:absolute;z-index:0}
 .hero{display:flex;gap:16px;align-items:flex-end;flex-wrap:wrap;margin-bottom:14px}
 .hero .cv{width:min(220px,100%);font-size:56px;box-shadow:0 8px 30px #0008}
 .hero .inf{flex:1 1 200px;min-width:0}
@@ -245,7 +260,8 @@ a.btn2:active{transform:scale(.92);filter:brightness(1.35)}
 </header>
 <main id="lib"></main>
 
-<section id="sheet"><div class="top"><button id="back" data-t>‹ Voltar</button></div><div id="sheetBody"></div></section>
+<section id="sheet"><div id="sbg"><i></i></div><div class="top"><button id="back" data-t>‹ Voltar</button>
+  <div class="bgsw" id="bgsw" role="group" title="Fundo da página do álbum"><button data-bg="glass" data-t>Vidro</button><button data-bg="vinyl" data-t>Vinil</button></div></div><div id="sheetBody"></div></section>
 
 <div id="toast"></div>
 <div id="bar">
@@ -280,7 +296,7 @@ const $=s=>document.querySelector(s);
 const LANG=document.documentElement.lang.toLowerCase().startsWith("en")?"en":"pt-BR",LOC=LANG==="en"?"en-US":"pt-BR";
 const EN={
   "Buscar álbum, artista ou faixa…":"Search albums, artists or tracks…","Álbuns":"Albums","Artistas":"Artists","Tocadas":"Played",
-  "Tocar do YouTube":"Play from YouTube","Reescanear biblioteca":"Rescan library","‹ Voltar":"‹ Back","Letra da música":"Lyrics",
+  "Tocar do YouTube":"Play from YouTube","Reescanear biblioteca":"Rescan library","‹ Voltar":"‹ Back","Vidro":"Glass","Vinil":"Vinyl","Fundo da página do álbum":"Album page background","Letra da música":"Lyrics",
   "Anterior":"Previous","Tocar/Pausar":"Play/Pause","Próxima":"Next","Volume":"Volume","Parar":"Stop","Diminuir volume":"Volume down","Aumentar volume":"Volume up",
   "Sem conexão com o servidor":"No connection to the server","Erro na página: ":"Page error: ",
   "Nada encontrado":"Nothing found","Nenhuma música encontrada":"No music found","álbum":"album","álbuns":"albums","faixa":"track","faixas":"tracks","{n} faixas":"{n} tracks",
@@ -424,11 +440,12 @@ function coverColors(d){                    // d: RGBA pixels of the cover, scal
   const dark=([h,s])=>`hsl(${Math.round(h)} ${Math.round(cl(s*1.1,.45,.8)*100)}% ${h>=40&&h<=75?24:28}%)`;   // yellows look brighter
   const cs=ks.map(k=>dark(hueOf(k))),[h,s]=hueOf(ks[0]);
   return {bg:cs[0],bg2:cs[1]||cs[0],bg3:cs[2]||cs[1]||cs[0],
+    vbg:`hsl(${Math.round(h)} ${Math.round(cl(s,.35,.6)*100)}% 20%)`,groove:`hsl(${Math.round(h)} ${Math.round(cl(s*1.2,.5,.85)*100)}% 55%)`,
     ac:`hsl(${Math.round(h)} ${Math.round(cl(s,.6,.9)*100)}% ${h>=200&&h<=280?72:64}%)`};
 }
 function albumTint(a){
   if(tintCache[a.id])return Promise.resolve(tintCache[a.id]);
-  const ph=`hsl(${hue((a.name||"")+(a.artist||""))} 35% 26%)`,gray={bg:"hsl(0 0% 17%)",bg2:"hsl(0 0% 17%)",bg3:"hsl(0 0% 17%)",ac:""};
+  const ph=`hsl(${hue((a.name||"")+(a.artist||""))} 35% 26%)`,gray={bg:"hsl(0 0% 17%)",bg2:"hsl(0 0% 17%)",bg3:"hsl(0 0% 17%)",vbg:"#1b1b1d",groove:"#8a8a8a",ac:""};
   return new Promise(res=>{
     const img=new Image();
     img.onload=()=>{
@@ -436,9 +453,9 @@ function albumTint(a){
         const c=document.createElement("canvas");c.width=c.height=48;
         const x=c.getContext("2d");x.drawImage(img,0,0,48,48);
         res(tintCache[a.id]=coverColors(x.getImageData(0,0,48,48).data)||gray);
-      }catch(e){res(tintCache[a.id]={bg:ph,bg2:ph,bg3:ph,ac:""})}
+      }catch(e){res(tintCache[a.id]={bg:ph,bg2:ph,bg3:ph,vbg:ph,groove:"#8a8a8a",ac:""})}
     };
-    img.onerror=()=>res(tintCache[a.id]={bg:ph,bg2:ph,bg3:ph,ac:""});   // same hue as the placeholder cover
+    img.onerror=()=>res(tintCache[a.id]={bg:ph,bg2:ph,bg3:ph,vbg:ph,groove:"#8a8a8a",ac:""});   // same hue as the placeholder cover
     img.src=`/api/cover/${a.id}?v=${a.cv||0}`;
   });
 }
@@ -450,10 +467,31 @@ function paint(el,c,pre){                   // c.ac is empty for gray covers: ke
 // so the album page looks like one piece; everywhere else both stay neutral.
 function setTint(key,a){
   const sh=$("#sheet"),bar=$("#bar"),meta=document.querySelector('meta[name="theme-color"]');
+  sh.classList.toggle("isalbum",!!a);
   if(!a){for(const el of [sh,bar]){el.classList.remove("tinted");el.style.removeProperty("--ac")}meta.content="#121212";return}
-  albumTint(a).then(c=>{if(openAlbum!==key)return;paint(sh,c,"tint");paint(bar,c,"btint");sh.classList.add("tinted");bar.classList.add("tinted");meta.content=c.bg});
+  albumTint(a).then(c=>{
+    if(openAlbum!==key)return;
+    paint(sh,c,"tint");paint(bar,c,"btint");
+    sh.style.setProperty("--vbg",c.vbg);sh.style.setProperty("--groove",c.groove);
+    sh.style.setProperty("--cvurl",`url("/api/cover/${a.id}?v=${a.cv||0}")`);
+    sh.classList.add("tinted");bar.classList.add("tinted");meta.content=albumBg==="vinyl"?c.vbg:c.bg;
+  });
 }
 
+
+let albumBg="glass";try{albumBg=localStorage.getItem("albumbg")==="vinyl"?"vinyl":"glass"}catch(e){}
+function setAlbumBg(v){
+  albumBg=v;$("#sheet").dataset.bg=v;
+  document.querySelectorAll("#bgsw button").forEach(b=>b.classList.toggle("on",b.dataset.bg===v));
+  try{localStorage.setItem("albumbg",v)}catch(e){}
+  grooveCenter();
+}
+function grooveCenter(){                    // the vinyl grooves come out from the middle of the album cover
+  const sh=$("#sheet"),cv=sh.querySelector(".hero .cv");if(!cv)return;
+  const r=cv.getBoundingClientRect(),o=sh.getBoundingClientRect();
+  sh.style.setProperty("--gx",Math.round(r.left-o.left+r.width/2)+"px");
+  sh.style.setProperty("--gy",Math.round(r.top-o.top+sh.scrollTop+r.height/2)+"px");
+}
 
 let editing=false;
 function renderSheet(){
@@ -472,7 +510,7 @@ function renderSheet(){
       <div class="acts"><button class="big" id="playAll">${PLAY} ${T("Tocar álbum")}</button><a class="btn2" id="dlAlbum" href="/api/download/${a.id}" download>${T("Baixar")}</a><button id="editAlbum">${T("Editar")}</button></div></div></div>`+
     a.tracks.map(t=>{const d=discs&&t.disc!==lastDisc?`<div class="disc">${T("Disco {n}",{n:t.disc})}</div>`:"";lastDisc=t.disc;
       return d+`<div class="t" data-t="${t.id}"><span class="n">${t.n||""}</span><span class="ti">${esc(t.title)}${t.artist&&t.artist!==a.artist?`<small>${esc(t.artist)}</small>`:""}</span>${af.mixed?fmtBadge(t.fmt):""}<span class="d">${t.dur?fmt(t.dur):""}</span></div>`}).join("");
-  markPlaying();
+  markPlaying();grooveCenter();
 }
 
 function renderEdit(a){
@@ -1129,6 +1167,8 @@ function openSheet(id){
 }
 function closeSheet(){$("#sheet").classList.remove("open");openAlbum=null;editing=false;$("#lyb").classList.remove("on");setTint()}
 $("#back").onclick=()=>history.back();
+$("#bgsw").onclick=e=>{const b=e.target.closest("button");if(b){navigator.vibrate?.(10);setAlbumBg(b.dataset.bg)}};
+setAlbumBg(albumBg);addEventListener("resize",grooveCenter);
 $("#sheet").addEventListener("scroll",e=>e.target.classList.toggle("scrolled",e.target.scrollTop>4),{passive:true});
 window.onpopstate=closeSheet;
 $("#sheetBody").onclick=e=>{
