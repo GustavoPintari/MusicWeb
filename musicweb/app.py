@@ -2,7 +2,7 @@
 import argparse, signal, sys, threading, time
 from http.server import ThreadingHTTPServer
 
-from . import covers, db, pot, radio, youtube
+from . import covers, db, radio
 from .config import cfg
 from .library import scan, watch_library
 from .player import monitor, mpv_events, mpv_start, restore_queue
@@ -29,15 +29,13 @@ def main(argv=None):
 
     db.open_db(cfg.db_file)
     covers.load_versions()
-    youtube.load_history()
     radio.load()
-    signal.signal(signal.SIGTERM, lambda *a: sys.exit(0))   # "kill" also stops the PO token server (atexit)
-    pot_status = pot.start()
+    signal.signal(signal.SIGTERM, lambda *a: sys.exit(0))   # "kill" exits cleanly (atexit handlers run)
     t0 = time.time()
     _, read = scan(cfg.root)
     print(f"{len(tracks)} faixas em {len(albums)} álbuns ({cfg.root}) em {time.time() - t0:.1f}s, "
           f"{read} arquivos lidos; mutagen={'sim' if mutagen else 'não'}; "
-          f"yt-dlp={'sim' if youtube.ytdlp_cmd() else 'não'}; PO token={pot_status}; config={cfg.source or 'padrão'}")
+          f"config={cfg.source or 'padrão'}")
     mpv_start()
     threading.Thread(target=mpv_events, daemon=True).start()
     threading.Thread(target=monitor, daemon=True).start()

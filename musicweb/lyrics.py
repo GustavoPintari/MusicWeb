@@ -4,7 +4,7 @@ import urllib.error, urllib.parse
 
 from .config import cfg
 from .i18n import _
-from .state import albums, item, yt_items
+from .state import albums, item
 from .util import clean_album, http_get, mutagen
 
 
@@ -117,24 +117,20 @@ def find_lyrics(tid, artist="", title=""):
     t = item(tid)
     if not t:
         return {"ok": False, "error": _("Faixa não encontrada")}
-    yt, manual = tid in yt_items, bool(artist or title)
+    manual = bool(artist or title)
     cache = os.path.join(cfg.lyrics_dir, tid + ".json")
     if not manual:
-        if not yt:
-            res = lyrics_local(t)
-            if res:
-                return res
+        res = lyrics_local(t)
+        if res:
+            return res
         try:
             with open(cache) as fh:
                 return json.load(fh)
         except (OSError, ValueError):
             pass
     alb = albums.get(t["album"])
-    if yt:
-        da, dt, album = t.get("l_artist", t["artist"]), t.get("l_title", t["title"]), ""
-    else:
-        da = t["artist"] or (alb["artist"] if alb and alb["artist"] not in ("Vários artistas", "Desconhecido") else "")
-        dt, album = t["title"], clean_album(alb["full"]) if alb else ""
+    da = t["artist"] or (alb["artist"] if alb and alb["artist"] not in ("Vários artistas", "Desconhecido") else "")
+    dt, album = t["title"], clean_album(alb["full"]) if alb else ""
     artist, title = (artist or da).strip(), clean_title((title or dt).strip())
     if not cfg.lyrics_online:
         return {"ok": False, "artist": artist, "title": title,

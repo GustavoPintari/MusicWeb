@@ -4,7 +4,7 @@ import time
 from . import db
 from .config import cfg
 from .i18n import name
-from .state import albums, item, lock, tracks, yt_items
+from .state import albums, item, lock, tracks
 
 
 def min_listen(dur):
@@ -23,7 +23,7 @@ def record_play(tid, output="remote"):
             return False
         alb = albums.get(it["album"])
         title, artist = it["title"], it["artist"] or (alb["artist"] if alb else "")
-        album = alb["name"] if alb else "YouTube"
+        album = alb["name"] if alb else ""
     db.execute("INSERT INTO plays(track_id, played_at, title, artist, album, output, dur) VALUES(?, ?, ?, ?, ?, ?, ?)",
                (tid, int(time.time()), title, artist, album, output, it["dur"] or 0))
     return True
@@ -33,9 +33,8 @@ def _entry(tid, title, artist, album):
     """Adds what the page needs to show/play a history row (the track may no longer exist)."""
     with lock:
         t = tracks.get(tid)
-        cover = t["album"] if t else (tid if tid in yt_items else None)
-    return {"id": tid, "title": title, "artist": name(artist), "album": name(album), "cover": cover,
-            "available": t is not None or tid in yt_items}
+    return {"id": tid, "title": title, "artist": name(artist), "album": name(album), "cover": t["album"] if t else None,
+            "available": t is not None}
 
 
 def stats(days=0):

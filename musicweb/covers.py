@@ -5,9 +5,8 @@ import urllib.error, urllib.parse
 from .config import cfg
 from .i18n import _
 from .radio import icon as radio_icon
-from .state import albums, lock, tracks, yt_items, yt_playlists
+from .state import albums, lock, tracks
 from .util import IMG_EXTS, clean_album, http_get, inside_root, mutagen, safe_name, sniff
-from .youtube import yt_thumb
 
 
 mb_lock = threading.Lock()         # MusicBrainz: at most 1 request per second
@@ -187,8 +186,6 @@ def cover_online(a):
 
 
 def get_cover(aid):
-    if aid in yt_items or aid in yt_playlists:
-        return yt_thumb(aid)
     if aid.startswith("radio_"):
         return radio_icon(aid)
     a = albums.get(aid)

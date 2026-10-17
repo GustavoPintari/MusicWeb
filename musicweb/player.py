@@ -6,7 +6,6 @@ from .config import cfg
 from .history import min_listen, record_play
 from .i18n import _, name
 from .state import albums, item, lock, state
-from .youtube import yt_direct
 
 
 MPV_SOCK = os.path.join(tempfile.gettempdir(), "musicweb-mpv.sock")
@@ -104,11 +103,11 @@ def mpv_events():
 
 
 def media_path(it):
-    """What mpv opens: the file, the radio stream, or (YouTube) this server's /api/stream, which renews expired links."""
-    return it.get("path") or f"http://{cfg.local_host}:{cfg.port}/api/stream/{it['id']}"
+    """What mpv opens: the music file or the radio stream."""
+    return it["path"]
 
 
-def play_pos(pos, start=0, fails=0):
+def play_pos(pos, start=0):
     with lock:
         state["restored"], state["appended"] = None, None
         if not 0 <= pos < len(state["queue"]):
@@ -124,7 +123,6 @@ def play_pos(pos, start=0, fails=0):
                 state["active"] = False
                 return
             path = media_path(it)
-            more = pos + 1 < len(state["queue"])
     if end:                                    # queue finished: nothing to resume after a restart
         db.kv_delete("queue")
         return
@@ -132,15 +130,6 @@ def play_pos(pos, start=0, fails=0):
         start = 0                              # live stream: nothing to seek to
     state["error"] = ""
     save_queue(start)
-    if not it.get("path"):
-        try:
-            yt_direct(it["id"])                    # gets the link ready now and surfaces any error
-        except Exception as e:
-            state["error"] = f"YouTube: {e}"
-            if more and fails < 2:                 # e.g. a private video in a playlist: skip it
-                return play_pos(pos + 1, fails=fails + 1)   # but not a whole playlist when YouTube refuses all
-            state["active"] = False
-            return
     mpv_start()
     state["seek"] = start if start and start > 1 else None
     mpv_cmd(["playlist-clear"], ["loadfile", path, "replace"], ["set_property", "pause", False])
@@ -307,6 +296,6 @@ def status():
                 "time": t or 0, "dur": dur or (cur["dur"] if cur else 0), "error": state["error"],
                 "volume": round(vol) if vol is not None else None, "lib": state["lib"],
                 "track": cur and {**{k: cur[k] for k in ("id", "title", "artist", "album", "fmt", "q")},
-                                  "album_name": name(alb["name"]) if alb else (cur["country"] if radio else "YouTube"),
+                                  "album_name": name(alb["name"]) if alb else (cur["country"] if radio else ""),
                                   "album_artist": name(alb["artist"]) if alb else cur["artist"],
                                   "radio": radio, "live": (live or "") if radio and st != "stopped" else ""}}

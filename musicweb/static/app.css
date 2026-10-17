@@ -182,15 +182,6 @@ a.btn2:active{transform:scale(.92);filter:brightness(1.35)}
 .ly.plain{white-space:pre-line;font-size:18px;font-weight:500;line-height:1.55;color:var(--fg)}
 .lysrc{color:var(--mut);font-size:12px;margin-top:24px}.lysrc a{color:var(--ac)}
 
-/* YouTube */
-#ytsh h1{font-size:22px;margin:4px 0 6px}
-#ytsh .note{color:var(--mut);font-size:13px;margin:0 0 14px}
-#ytf{display:flex;gap:8px;flex-wrap:wrap}
-#ytu{flex:1 1 220px;min-width:0;padding:11px 12px;border-radius:10px;border:1px solid #333;background:var(--card);color:var(--fg);font:inherit}
-#ytu:focus{outline:none;border-color:var(--ac)}
-#yterr{color:var(--err);font-size:13px;margin-top:8px}
-.t .yth{width:68px;aspect-ratio:16/9;flex:none;font-size:16px;border-radius:5px}
-.t .x{background:none;color:var(--mut);padding:6px 8px;flex:none}
 
 /* played: most played and history */
 .per{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:8px 0 4px}

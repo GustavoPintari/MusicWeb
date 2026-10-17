@@ -44,10 +44,7 @@ function renderPlays(){
 async function playFromHistory(id,el){
   el.classList.add("busy");
   try{
-    if(!trackById[id]){
-      if(!id.startsWith("yt_")){toast(T("Essa faixa não está mais na biblioteca"));return}
-      await addYT("https://youtu.be/"+id.slice(3));        // left the YouTube history: add it again
-    }
+    if(!trackById[id]){toast(T("Essa faixa não está mais na biblioteca"));return}
     await ctl.playTrack(id);
   }catch(e){toast(e.message,6000)}
   finally{el.classList.remove("busy")}
