@@ -181,6 +181,37 @@ a.btn2:active{transform:scale(.92);filter:brightness(1.35)}
 #volpop input{flex:1;accent-color:var(--ac);height:28px}
 #volpop span{min-width:40px;text-align:right;color:var(--mut);font-size:13px;font-variant-numeric:tabular-nums}
 #vol.on{color:var(--ac)}
+#sh.on{color:var(--ac)}
+#sh.on::after{content:"";position:absolute;bottom:5px;left:50%;width:4px;height:4px;margin-left:-2px;border-radius:50%;background:currentColor}
+#sh{position:relative}
+
+/* full screen player: only offered with a mouse and a wide window; the bar fills the window, the cover big in the
+   middle, everything centered, over a blurred copy of the cover (--gurl, set by colors.js) */
+#fs{display:none}
+@media (hover:hover) and (pointer:fine) and (min-width:820px){#fs{display:grid}}
+body.full{overflow:hidden}
+body.full #bar{top:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;
+  padding:28px 40px 36px;background:#0d0d0d;overflow:hidden;isolation:isolate;border-top:0}
+body.full #bar::before{content:"";position:absolute;inset:-80px;z-index:-1;background:var(--gurl,none) center/cover;
+  filter:blur(90px) saturate(1.5) brightness(.45);opacity:.9}
+body.full #bar>*{width:100%;max-width:760px}
+body.full #outrow{position:absolute;top:20px;left:40px;right:40px;max-width:none;width:auto}
+body.full .pl{display:contents}
+body.full #now{order:1;flex:none;flex-direction:column;gap:22px;text-align:center;cursor:pointer}
+body.full #now .cv{width:min(46vh,440px);font-size:96px;border-radius:14px;box-shadow:0 24px 60px #000a}
+body.full #now .tx{max-width:100%}
+body.full #now .tx b{font-size:30px;line-height:1.2}
+body.full #now .tx small{font-size:17px;margin-top:6px}
+body.full #vzc{order:2;height:min(12vh,110px);margin:0}
+body.full #pg{order:3;font-size:13px}
+body.full .ctl{order:4;justify-content:center;gap:14px}
+body.full .ctl button{width:50px;height:50px}
+body.full .ctl #pp{width:64px;height:64px}
+body.full .ctl svg{width:24px;height:24px}
+body.full #volpop{order:5;max-width:420px}
+body.full #err{order:6;text-align:center}
+body.full #toast{bottom:40px}
+body.full #st{display:grid}
 .empty{color:var(--mut);text-align:center;margin-top:40px}
 
 /* lyrics */
@@ -247,4 +278,4 @@ a.btn2:active{transform:scale(.92);filter:brightness(1.35)}
 .bars .b span{font-size:11px;color:var(--fg);margin-bottom:3px;font-variant-numeric:tabular-nums}
 .axis{display:flex;gap:2px;margin-top:4px}.axis span{flex:1;text-align:center;font-size:10px;color:var(--mut);min-width:0}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
-@media (max-width:520px){#st{display:none}}
+@media (max-width:520px){#st{display:none}.ctl{gap:2px}.ctl button{width:38px;height:38px}#pp{width:44px;height:44px}}

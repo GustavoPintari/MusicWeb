@@ -54,13 +54,34 @@ $("#sheetBody").onsubmit=e=>{
   if(e.target.id==="lyf"){e.preventDefault();e.target.querySelector("button").classList.add("busy");
     fetchLyrics(LY.tid,$("#lya").value.trim(),$("#lyt").value.trim())}
 };
-$("#now").onclick=()=>{if(S.track&&!$("#sheet").classList.contains("open"))openSheet(byId[S.track.album]?S.track.album:"@radio")};
+$("#now").onclick=()=>{if(!S.track)return;fullPlayer(false);if(!$("#sheet").classList.contains("open"))openSheet(byId[S.track.album]?S.track.album:"@radio")};
 $("#rdb").onclick=()=>openSheet("@radio");
-$("#lyb").onclick=()=>{navigator.vibrate?.(10);if(openAlbum==="@ly")history.back();else openSheet("@ly")};
+$("#lyb").onclick=()=>{navigator.vibrate?.(10);fullPlayer(false);if(openAlbum==="@ly")history.back();else openSheet("@ly")};
 $("#pp").onclick=e=>ctl.toggle(e.currentTarget);
 $("#nx").onclick=e=>ctl.next(e.currentTarget);
 $("#pv").onclick=e=>ctl.prev(e.currentTarget);
 $("#st").onclick=e=>ctl.stop(e.currentTarget);
+$("#sh").onclick=e=>ctl.shuffle(e.currentTarget);
+
+// full screen player (desktop): the bar takes the whole window, with the cover big; the browser goes full screen
+// too when it allows it. Esc (or the same button) goes back.
+const FS_ON='<svg viewBox="0 0 24 24"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>';
+const FS_OFF='<svg viewBox="0 0 24 24"><path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"/></svg>';
+function fullPlayer(on){
+  if(document.body.classList.contains("full")===on)return;
+  document.body.classList.toggle("full",on);
+  const b=$("#fs");b.innerHTML=on?FS_OFF:FS_ON;b.title=T(on?"Sair da tela cheia":"Tela cheia");b.classList.toggle("on",on);
+  if(on)document.documentElement.requestFullscreen?.().catch(()=>{});
+  else if(document.fullscreenElement)document.exitFullscreen().catch(()=>{});
+  fitBar();vizWake();
+}
+$("#fs").onclick=()=>fullPlayer(!document.body.classList.contains("full"));
+document.addEventListener("fullscreenchange",()=>{if(!document.fullscreenElement)fullPlayer(false)});   // Esc in browser full screen
+addEventListener("keydown",e=>{
+  if(!document.body.classList.contains("full")||e.target.closest("input,textarea"))return;
+  if(e.key==="Escape")fullPlayer(false);
+  else if(e.key===" "){e.preventDefault();ctl.toggle($("#pp"))}
+});
 $("#rs").onclick=async e=>{const b=e.currentTarget;await api("rescan",null,b);b.classList.add("busy");await load();b.classList.remove("busy")};
 
 let volDragging=false,volTimer=null;

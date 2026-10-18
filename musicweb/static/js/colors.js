@@ -78,11 +78,11 @@ let themeKey=null;
 function setHomeTheme(tr){
   const a=tr&&!tr.radio&&(byId[tr.album]||trackById[tr.id]?.a||{id:tr.album,name:tr.album_name,artist:""}),root=document.documentElement;
   themeKey=a?a.id:null;
-  if(!a){document.body.classList.remove("glowing");root.style.removeProperty("--ac");vizTint(null);return}
+  if(!a){document.body.classList.remove("glowing");$("#bar").style.removeProperty("--gurl");root.style.removeProperty("--ac");vizTint(null);return}
   albumTint(a).then(c=>{
     if(themeKey!==a.id)return;
     vizTint(c);
-    $("#glow").style.setProperty("--gurl",`url("/api/cover/${a.id}?v=${a.cv||0}")`);
+    for(const el of [$("#glow"),$("#bar")])el.style.setProperty("--gurl",`url("/api/cover/${a.id}?v=${a.cv||0}")`);
     document.body.classList.add("glowing");
     if(c.ac)root.style.setProperty("--ac",c.ac);else root.style.removeProperty("--ac");
   });

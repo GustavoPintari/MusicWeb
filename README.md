@@ -25,6 +25,8 @@ It only needs the Python standard library. `mutagen` is optional and unlocks ext
 - ✨ **Retrospectiva** (recap): a month or a year of listening — hours, top tracks, artists and albums, busiest hour and day, comparison with the previous period.
 - 🎨 **Album colors**: opening an album paints the background with a gradient from its cover's dominant color.
 - **Gapless playback and ReplayGain** on the Receiver (mpv).
+- 🔀 **Shuffle** on either output: the rest of the queue gets a random order without stopping the current track; turning it off goes back to the original order.
+- ⛶ **Full screen player** on desktop: big cover, visualizer and controls over a blurred copy of the cover (Esc goes back, space plays/pauses).
 - **Queue survives restarts**: after a reboot or crash, the queue comes back paused where it stopped — press play to continue.
 - **Interface in Portuguese (BR) or English** (`[interface] language`).
 - **Fast startup** on large libraries: tags are read once and cached in SQLite; later scans only read new or changed files.
@@ -246,6 +248,8 @@ Só usa a biblioteca padrão do Python. O `mutagen` é opcional e libera recurso
 - ✨ **Retrospectiva**: um mês ou um ano de música — horas, músicas, artistas e álbuns mais ouvidos, horário e dia preferidos, comparação com o período anterior.
 - 🎨 **Cores do disco**: ao abrir um álbum, o fundo ganha um degradê com a cor dominante da capa.
 - **Reprodução sem pausa entre faixas (gapless) e ReplayGain** no Receiver (mpv).
+- 🔀 **Ordem aleatória** nas duas saídas: o resto da fila é embaralhado sem parar a faixa atual; ao desligar, volta à ordem original.
+- ⛶ **Player em tela cheia** no computador: capa grande, visualizador e controles sobre a capa desfocada (Esc volta, espaço toca/pausa).
 - **Fila que sobrevive a reinício**: depois de religar o celular ou de uma queda, a fila volta pausada onde parou — é só apertar play.
 - **Interface em português (BR) ou inglês** (`[interface] language`).
 - **Inicialização rápida** em bibliotecas grandes: as tags são lidas uma vez e guardadas no SQLite; as varreduras seguintes só leem arquivos novos ou alterados.

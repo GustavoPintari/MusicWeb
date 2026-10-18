@@ -1,5 +1,5 @@
 """mpv control (the "Receiver" output): queue, events, playback state, saved queue and play counting."""
-import itertools, json, os, socket, subprocess, tempfile, threading, time
+import itertools, json, os, random, socket, subprocess, tempfile, threading, time
 
 from . import db
 from .config import cfg
@@ -168,6 +168,57 @@ def track_ended():
         play_pos(nxt)
 
 
+# ---------------------------------------------------------------- shuffle
+
+def _shuffled(queue, pos):
+    """The track at pos first, then all the others in random order."""
+    rest = queue[:pos] + queue[pos + 1:]
+    random.shuffle(rest)
+    return [queue[pos]] + rest
+
+
+def set_queue(queue, pos=None):
+    """A new queue to play (call with the lock held); in shuffle mode it is shuffled, starting at pos.
+    pos None: from the start (a random track in shuffle mode). Returns the position to play."""
+    queue = list(queue)
+    state["order"] = queue
+    if pos is None:
+        pos = random.randrange(len(queue)) if state["shuffle"] and queue else 0
+    if state["shuffle"] and 0 <= pos < len(queue):
+        queue, pos = _shuffled(queue, pos), 0
+    state["queue"] = queue
+    return pos
+
+
+def set_shuffle(on):
+    """Turns shuffle on (the rest of the queue gets a random order) or off (back to the original order),
+    without interrupting the track that is playing."""
+    with lock:
+        if on == state["shuffle"]:
+            return
+        state["shuffle"] = on
+        queue, pos = state["queue"], state["pos"]
+        if not 0 <= pos < len(queue):
+            return
+        cur = queue[pos]
+        if on:
+            state["order"] = list(queue)
+            state["queue"], state["pos"] = _shuffled(queue, pos), 0
+        elif state["order"] and cur in state["order"]:
+            state["queue"], state["pos"] = state["order"], state["order"].index(cur)
+        active = state["active"]
+        if active:
+            state["appended"] = None
+        restored = state["restored"]
+    db.kv_set("shuffle", on)
+    if active:                                 # gapless: the next track already sent to mpv is not the next one anymore
+        mpv_cmd(["playlist-clear"])            # (it removes everything but the current file)
+        queue_next()
+        save_position()
+    else:
+        save_queue(restored or 0)
+
+
 def stop():
     with lock:
         state["active"], state["restored"], state["appended"] = False, None, None
@@ -205,9 +256,10 @@ def seek(t):
 
 def save_queue(t=0):
     with lock:
-        queue, pos = list(state["queue"]), state["pos"]
+        queue, pos, order = list(state["queue"]), state["pos"], state["order"]
     if queue and 0 <= pos < len(queue):
-        db.kv_set("queue", {"queue": queue, "pos": pos, "t": round(t or 0, 1), "saved": int(time.time())})
+        db.kv_set("queue", {"queue": queue, "pos": pos, "t": round(t or 0, 1), "saved": int(time.time()),
+                            "order": list(order) if order and order != queue else None})
 
 
 def save_position():
@@ -219,6 +271,7 @@ def save_position():
 
 def restore_queue():
     """Loads the queue saved before the last shutdown. It stays paused unless resume_on_start is set."""
+    state["shuffle"] = bool(db.kv_get("shuffle", False))
     saved = db.kv_get("queue")
     if not saved:
         return False
@@ -234,7 +287,9 @@ def restore_queue():
     else:                                              # current track is gone: continue with the next one
         pos, t = min(len([x for x in old[:pos] if x in queue]), len(queue) - 1), 0
     with lock:
+        order = [x for x in saved.get("order") or queue if item(x)] or queue
         state["queue"], state["pos"], state["active"], state["restored"] = queue, pos, False, t
+        state["order"] = order + [x for x in queue if x not in order]
     if cfg.resume_on_start:
         play_pos(pos, t)
     return True
@@ -294,7 +349,7 @@ def status():
         radio = bool(cur and cur.get("radio"))
         return {"state": st, "pos": state["pos"], "total": len(state["queue"]),
                 "time": t or 0, "dur": dur or (cur["dur"] if cur else 0), "error": state["error"],
-                "volume": round(vol) if vol is not None else None, "lib": state["lib"],
+                "volume": round(vol) if vol is not None else None, "lib": state["lib"], "shuffle": state["shuffle"],
                 "track": cur and {**{k: cur[k] for k in ("id", "title", "artist", "album", "fmt", "q")},
                                   "album_name": name(alb["name"]) if alb else (cur["country"] if radio else ""),
                                   "album_artist": name(alb["artist"]) if alb else cur["artist"],

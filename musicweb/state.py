@@ -12,6 +12,8 @@ state = {
     "gen": 0,              # bumped on every play_pos(), so replaying the same track counts as a new play
     "appended": None,      # gapless: queue index already appended to mpv's playlist after the current one
     "error": "", "lib": 0, "seek": None,
+    "shuffle": False,      # the queue is in random order; "order" keeps the original one, to go back to it
+    "order": None,
 }
 
 
