@@ -15,6 +15,8 @@ function show(s){
   const prevId=S.track?.id,prevLive=S.track?.live;S=s;recvAt=performance.now();
   $("#pp").innerHTML=s.state==="playing"?PAUSE:PLAY;
   $("#bar").classList.toggle("playing",s.state==="playing");
+  $("#sh").classList.toggle("on",!!s.shuffle);$("#sh").setAttribute("aria-pressed",!!s.shuffle);
+  repShow(s.repeat);
   if($("#err").textContent!==(s.error||"")){$("#err").textContent=s.error||"";fitBar()}
   if(s.track?.id!==prevId){
     const a=s.track&&(byId[s.track.album]||trackById[s.track.id]?.a);
@@ -52,18 +54,33 @@ function tick(){                            // the fill of the track is drawn ev
   vizWake();
 }
 
+// ---------- repeat: "off" → "all" (the queue starts over) → "one" (the same track again)
+const REP=["off","all","one"],REPNAME={off:"Repetir desligado",all:"Repetir a fila",one:"Repetir a faixa"};
+const REP_ICON='<svg viewBox="0 0 24 24"><path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/></svg>';
+const REP1_ICON='<svg viewBox="0 0 24 24"><path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4zm-4-2V9h-1l-2 1v1h1.5v4H13z"/></svg>';
+function repShow(r){
+  r=REP.includes(r)?r:"off";const b=$("#rp");if(b.dataset.r===r)return;
+  b.dataset.r=r;b.innerHTML=r==="one"?REP1_ICON:REP_ICON;b.classList.toggle("on",r!=="off");b.title=T(REPNAME[r]);
+}
+// queue index after the current track on this device (same rules as the server's next_pos)
+function localNext(skip){
+  if(L.repeat==="one"&&!skip)return L.pos;
+  return L.pos+1>=L.queue.length&&L.repeat!=="off"?0:L.pos+1;
+}
+
 // ---------- audio output: "remote" = phone on the receiver, "local" = this device
 let mode="remote",playerName="Receiver",trackById={};
 try{mode=localStorage.getItem("out")==="local"?"local":"remote"}catch(e){}
 const au=new Audio();au.preload="auto";
-const L={queue:[],pos:-1,err:""};
+const L={queue:[],pos:-1,err:"",shuffle:false,order:null,repeat:"off"};   // order: the queue before shuffling
+try{L.shuffle=localStorage.getItem("lshuf")==="1";const r=localStorage.getItem("lrep");if(REP.includes(r))L.repeat=r}catch(e){}
 try{const v=localStorage.getItem("lvol");if(v!=null)au.volume=Math.min(1,Math.max(0,+v))}catch(e){}
 
 function localStatus(){
   const ti=L.pos>=0&&trackById[L.queue[L.pos]];
   const st=!ti?"stopped":(!au.paused?"playing":(au.ended?"stopped":"paused"));
   return {state:st,time:au.currentTime||0,dur:isFinite(au.duration)&&au.duration?au.duration:(ti?ti.t.dur:0),
-    volume:Math.round(au.volume*100),error:L.err,
+    volume:Math.round(au.volume*100),error:L.err,shuffle:L.shuffle,repeat:L.repeat,
     track:ti&&{id:ti.t.id,title:ti.t.title,artist:ti.t.artist,album:ti.a.id,album_name:ti.t.radio?ti.t.country:ti.a.name,album_artist:ti.a.artist,
       fmt:ti.t.fmt,q:ti.t.q,radio:!!ti.t.radio,live:""}};
 }
@@ -79,6 +96,28 @@ function loadHls(){
     document.head.append(sc)});
 }
 function hlsStop(){if(hlsPlayer){hlsPlayer.destroy();hlsPlayer=null}}
+
+// shuffle (same as the server's): the chosen track first, then the others in random order
+function shuffled(ids,pos){
+  const r=ids.filter((_,i)=>i!==pos);
+  for(let i=r.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[r[i],r[j]]=[r[j],r[i]]}
+  return [ids[pos],...r];
+}
+function localStart(ids,pos,t=0,autoplay=true){   // a new queue on this device; pos null: from the start
+  L.order=ids;
+  if(pos==null)pos=L.shuffle?Math.floor(Math.random()*ids.length):0;
+  if(L.shuffle&&pos>=0&&pos<ids.length){ids=shuffled(ids,pos);pos=0}
+  localPlay(ids,pos,t,autoplay);
+}
+function localShuffle(on){                  // reorders the queue without touching the track that is playing
+  L.shuffle=on;try{localStorage.setItem("lshuf",on?"1":"0")}catch(e){}
+  const cur=L.queue[L.pos];
+  if(L.pos>=0&&cur!=null){
+    if(on){L.order=L.queue;L.queue=shuffled(L.queue,L.pos);L.pos=0}
+    else if(L.order?.includes(cur)){L.queue=L.order;L.pos=L.order.indexOf(cur)}
+  }
+  lshow();
+}
 
 let LC={tid:null};                          // listening counter for the current local track
 function localPlay(queue,pos,t=0,autoplay=true){
@@ -108,7 +147,9 @@ function localPlay(queue,pos,t=0,autoplay=true){
   lshow();
 }
 function localStop(){hlsStop();au.pause();au.removeAttribute("src");au.load();L.pos=-1;lshow()}
-au.addEventListener("ended",()=>localPlay(L.queue,L.pos+1));
+au.addEventListener("ended",()=>{
+  if(L.repeat==="one"&&L.queue[L.pos]){au.currentTime=0;LC={tid:L.queue[L.pos],heard:0,last:null,counted:false};au.play().catch(()=>{});return}
+  localPlay(L.queue,localNext())});
 au.addEventListener("error",()=>{
   if(!au.getAttribute("src")||hlsPlayer)return;
   const q=L.queue,p=L.pos,tid=q[p],ti=trackById[tid];
@@ -116,7 +157,7 @@ au.addEventListener("error",()=>{
   lshow();
   L.fails=(L.fails||0)+1;
   if(L.fails>=3)return;                      // don't run through a whole album when every track fails
-  setTimeout(()=>{if(L.err&&L.queue===q&&L.pos===p)localPlay(q,p+1)},2500);
+  setTimeout(()=>{if(L.err&&L.queue===q&&L.pos===p)localPlay(q,localNext(true))},2500);
 });
 au.addEventListener("playing",()=>{L.fails=0});
 ["play","pause","loadedmetadata"].forEach(ev=>au.addEventListener(ev,lshow));
@@ -147,19 +188,26 @@ if("mediaSession" in navigator){
 
 // every control works in both modes
 const ctl={
-  playAlbum(aid,btn){const a=byId[aid];if(mode==="local")localPlay(a.tracks.map(t=>t.id),0);else return api("play",{album:aid},btn)},
-  playQueue(ids,pos=0,plid){if(mode==="local"){localPlay(ids,pos);return Promise.resolve()}
+  playAlbum(aid,btn){const a=byId[aid];if(mode==="local")localStart(a.tracks.map(t=>t.id),null);else return api("play",{album:aid},btn)},
+  playQueue(ids,pos=0,plid){if(mode==="local"){localStart(ids,pos);return Promise.resolve()}
     return plid?api("play",{playlist:plid,pos}):api("play",{queue:ids,pos})},
-  playTrack(tid){const ti=trackById[tid];if(mode==="local"){const q=ti.a.tracks.map(t=>t.id);localPlay(q,q.indexOf(tid));return Promise.resolve()}
+  playTrack(tid){const ti=trackById[tid];if(mode==="local"){const q=ti.a.tracks.map(t=>t.id);localStart(q,q.indexOf(tid));return Promise.resolve()}
     return api("play",{id:tid})},
   toggle(btn){
     if(!S.track)return;
     if(mode==="local"){navigator.vibrate?.(10);au.paused?au.play().catch(()=>{}):au.pause();return}
     const p=S.state==="playing";S.state=p?"paused":"playing";S.time=(S.time||0)+(p?(performance.now()-recvAt)/1000:0);recvAt=performance.now();
     btn.innerHTML=p?PLAY:PAUSE;api(p?"pause":"resume",null,btn)},
-  next(btn){if(mode==="local"){navigator.vibrate?.(10);localPlay(L.queue,L.pos+1)}else api("next",null,btn)},
+  next(btn){if(mode==="local"){navigator.vibrate?.(10);localPlay(L.queue,localNext(true))}else api("next",null,btn)},
   prev(btn){if(mode==="local"){navigator.vibrate?.(10);if(au.currentTime>5){au.currentTime=0;lshow()}else localPlay(L.queue,Math.max(0,L.pos-1))}
     else api("prev",null,btn)},
+  shuffle(btn){const on=!S.shuffle;toast(on?T("Ordem aleatória ligada"):T("Ordem aleatória desligada"),1500);
+    if(mode==="local"){navigator.vibrate?.(10);localShuffle(on);return Promise.resolve()}
+    S.shuffle=on;$("#sh").classList.toggle("on",on);return api("shuffle",{on},btn)},
+  repeat(btn){const r=REP[(REP.indexOf(S.repeat||"off")+1)%REP.length];toast(T(REPNAME[r]),1500);repShow(r);S.repeat=r;
+    if(mode==="local"){navigator.vibrate?.(10);L.repeat=r;try{localStorage.setItem("lrep",r)}catch(e){};lshow();return Promise.resolve()}
+    return api("repeat",{mode:r},btn)},
+  mute(){if((S.volume??100)>0){ctl.muted=S.volume;return ctl.volume(0)}return ctl.volume(ctl.muted||50)},
   stop(btn){if(mode==="local"){navigator.vibrate?.(10);localStop()}else api("stop",null,btn)},
   seek(t){if(mode==="local"){au.currentTime=t;lshow()}else{S.time=t;recvAt=performance.now();tick();api("seek",{t})}},
   volume(v){v=Math.max(0,Math.min(100,v));
@@ -185,7 +233,7 @@ async function switchOutput(){
       if(ti){
         const q=ti.a.tracks.map(t=>t.id),playing=st.state==="playing";
         fetch("/api/pause",{method:"POST"});
-        localPlay(q,q.indexOf(ti.t.id),st.time||0,playing);
+        localStart(q,q.indexOf(ti.t.id),st.time||0,playing);
       }else show(localStatus());
       toast(T("Tocando neste dispositivo"));
     }else{
@@ -202,6 +250,11 @@ $("#out").onclick=switchOutput;
 
 // the player bar changes height (volume slider, error line, screen width): keep the page's
 // bottom padding equal to it, so the last tracks can always be scrolled out from under it
-function fitBar(){document.documentElement.style.setProperty("--barh",$("#bar").offsetHeight+"px")}
+// In the expanded player, --lyb is the room the title and controls take at the bottom: on a narrow screen the
+// lyrics fill the space above them.
+function fitBar(){
+  const st=document.documentElement.style;st.setProperty("--barh",$("#bar").offsetHeight+"px");
+  if(document.body.classList.contains("full"))st.setProperty("--lyb",(innerHeight-$("#now").getBoundingClientRect().top+8)+"px");
+}
 if("ResizeObserver" in window)new ResizeObserver(fitBar).observe($("#bar"));
 fitBar();addEventListener("resize",fitBar);
