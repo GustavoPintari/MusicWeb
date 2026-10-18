@@ -10,7 +10,8 @@ from .history import record_play, stats
 from .i18n import _
 from .library import library_json, scan
 from .lyrics import get_lyrics
-from .player import mpv_cmd, pause, play_pos, resume, next_pos, seek, set_queue, set_repeat, set_shuffle, status, stop
+from .player import (busy_for, claim, mpv_cmd, next_pos, pause, play_pos, release, resume, seek, set_queue, set_repeat,
+                     set_shuffle, status, stop)
 from .retro import periods as retro_periods, retro
 from .state import albums, item, lock, state, tracks
 from .util import MIME, sniff, zip_name
@@ -39,6 +40,20 @@ def versioned(page):
 
 
 MAX_UPLOAD = 20 * 1024 * 1024
+
+# what changes the Receiver's playback: only the device using it may do it (see player.busy_for)
+CONTROL = {"/api/play", "/api/pause", "/api/resume", "/api/stop", "/api/next", "/api/prev", "/api/seek",
+           "/api/volume", "/api/shuffle", "/api/repeat"}
+
+
+def device_name(ua):
+    """A short name for a device, from its browser's User-Agent: "Android · Chrome"."""
+    system = next((n for k, n in (("iPhone", "iPhone"), ("iPad", "iPad"), ("Android", "Android"), ("Windows", "Windows"),
+                                  ("Macintosh", "Mac"), ("CrOS", "ChromeOS"), ("Linux", "Linux")) if k in ua), "")
+    browser = next((n for k, n in (("Firefox/", "Firefox"), ("FxiOS", "Firefox"), ("Edg", "Edge"), ("OPR/", "Opera"),
+                                   ("SamsungBrowser", "Samsung Internet"), ("CriOS", "Chrome"), ("Chrome/", "Chrome"),
+                                   ("Safari/", "Safari")) if k in ua), "")
+    return " · ".join(x for x in (system, browser) if x) or _("outro dispositivo")
 
 
 class _Counter:
@@ -96,7 +111,7 @@ class H(BaseHTTPRequestHandler):
         elif p == "/api/library":
             self.send(library_json())
         elif p == "/api/status":
-            self.send(json.dumps(status()))
+            self.send(json.dumps(status(self.client())))
         elif p == "/api/cover_search":
             self.send(json.dumps(cover_candidates(q.get("q", [""])[0])))
         elif p == "/api/lyrics":
@@ -212,6 +227,10 @@ class H(BaseHTTPRequestHandler):
         except (BrokenPipeError, ConnectionResetError):
             pass
 
+    def client(self):
+        """Id of the browser making the request (kept in its localStorage; see util.js)."""
+        return self.headers.get("X-Client", "")[:64]
+
     def do_POST(self):
         n = int(self.headers.get("Content-Length") or 0)
         p, _sep, qs = self.path.partition("?")
@@ -229,6 +248,17 @@ class H(BaseHTTPRequestHandler):
         except ValueError:
             body = {}
         p = self.path
+        cid = self.client()
+        if p in CONTROL:
+            if busy_for(cid):
+                who = (status(cid).get("owner") or {}).get("name") or _("outro dispositivo")
+                return self.send(json.dumps({**status(cid), "busy": True, "error": _(
+                    "{player} está tocando para {who}. Para ouvir sem atrapalhar, toque em \"{player}\" e escolha este dispositivo.",
+                    player=cfg.player_name, who=who)}), code=409)
+            if p == "/api/stop" or (p == "/api/pause" and body.get("release")):
+                release(cid)                             # this device is done with the Receiver
+            else:
+                claim(cid, device_name(self.headers.get("User-Agent", "")))
         if p == "/api/play":
             with lock:
                 if body.get("album") in albums:
@@ -305,4 +335,4 @@ class H(BaseHTTPRequestHandler):
             return self.send(json.dumps(remove_album(body.get("album", ""), bool(body.get("permanent")))))
         else:
             return self.send("{}", code=404)
-        self.send(json.dumps(status()))
+        self.send(json.dumps(status(cid)))

@@ -113,7 +113,7 @@ def media_path(it):
 
 def play_pos(pos, start=0):
     with lock:
-        state["restored"], state["appended"] = None, None
+        state["restored"], state["appended"], state["paused_at"] = None, None, None
         if not 0 <= pos < len(state["queue"]):
             state["active"] = False
             end = True
@@ -260,6 +260,8 @@ def stop():
 
 def pause():
     mpv_cmd(["set_property", "pause", True])
+    with lock:
+        state["paused_at"] = time.time()
     save_position()
 
 
@@ -271,6 +273,8 @@ def resume():
         play_pos(pos, restored)
     else:
         mpv_cmd(["set_property", "pause", False])
+        with lock:
+            state["paused_at"] = None
 
 
 def seek(t):
@@ -282,6 +286,38 @@ def seek(t):
         save_queue(t)
     else:
         mpv_cmd(["seek", t, "absolute"])
+
+
+# ---------------------------------------------------------------- who is using the Receiver
+# The device that plays something on the Receiver keeps it: the others see what is playing but can't change it,
+# until it stops (end of the queue, "stop", switching that device to its own output) or stays paused for
+# [player] lock_minutes. Devices are told apart by an id their browser keeps (the X-Client header).
+
+def _owner_now():
+    """Id of the device holding the Receiver, or None when it is free (call with the lock held)."""
+    if cfg.lock_minutes <= 0 or not state["owner"] or not state["active"]:
+        return None
+    if state["paused_at"] and time.time() - state["paused_at"] > cfg.lock_minutes * 60:
+        return None
+    return state["owner"]
+
+
+def busy_for(cid):
+    """True when another device is using the Receiver."""
+    with lock:
+        owner = _owner_now()
+    return owner is not None and owner != cid
+
+
+def claim(cid, who):
+    with lock:
+        state["owner"], state["owner_name"] = cid, who
+
+
+def release(cid):
+    with lock:
+        if state["owner"] == cid:
+            state["owner"], state["owner_name"] = None, ""
 
 
 # ---------------------------------------------------------------- saved queue (survives restarts)
@@ -360,7 +396,8 @@ def monitor():
             print("[player] monitor:", e, flush=True)
 
 
-def status():
+def status(cid=None):
+    """cid: the asking device, so it knows whether it is the one holding the Receiver."""
     idle, paused, t, dur, vol, live = mpv_cmd(["get_property", "idle-active"], ["get_property", "pause"],
                                               ["get_property", "time-pos"], ["get_property", "duration"],
                                               ["get_property", "volume"],
@@ -378,11 +415,13 @@ def status():
             st = "stopped"
         else:
             st = "paused" if paused else "playing"
+        owner = _owner_now() if st != "stopped" else None
         alb = cur and albums.get(cur["album"])
         radio = bool(cur and cur.get("radio"))
         return {"state": st, "pos": state["pos"], "total": len(state["queue"]),
                 "time": t or 0, "dur": dur or (cur["dur"] if cur else 0), "error": state["error"],
                 "volume": round(vol) if vol is not None else None, "lib": state["lib"], "shuffle": state["shuffle"], "repeat": state["repeat"],
+                "owner": owner and {"you": owner == cid, "name": state["owner_name"]},
                 "track": cur and {**{k: cur[k] for k in ("id", "title", "artist", "album", "fmt", "q")},
                                   "album_name": name(alb["name"]) if alb else (cur["country"] if radio else ""),
                                   "album_artist": name(alb["artist"]) if alb else cur["artist"],

@@ -72,7 +72,7 @@ function vizTint(c){                        // c: albumTint() colors of the play
 function vizShow(){                         // the band takes room in the bar only while it has something to show
   const on=vzMode!=="off"&&!!S.track,bar=$("#bar");
   if(bar.classList.contains("vz")!==on){bar.classList.toggle("vz",on);fitBar()}
-  const b=$("#vzb");b.classList.toggle("on",vzMode!=="off");b.title=T("Visualizador")+": "+T(VZNAME[vzMode]);
+  const b=$("#vzb");b.classList.toggle("on",vzMode!=="off");b.querySelector("span").textContent=T("Visualizador")+": "+T(VZNAME[vzMode]);
 }
 $("#vzb").onclick=()=>{
   navigator.vibrate?.(10);

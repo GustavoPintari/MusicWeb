@@ -28,6 +28,7 @@ FILE_KEYS = {
     ("history", "enabled"): ("history_enabled", bool),
     ("history", "min_seconds"): ("history_min_seconds", int),
     ("player", "resume_on_start"): ("resume_on_start", bool),
+    ("player", "lock_minutes"): ("lock_minutes", int),
 }
 
 # sections of older versions, ignored with a note instead of a warning per option
@@ -75,6 +76,8 @@ class Config:
     history_enabled: bool = True             # record plays for history / most played
     history_min_seconds: int = 30            # listening time before a track counts as played
     resume_on_start: bool = False            # start playing the saved queue right away after a restart
+    lock_minutes: int = 10                   # the device playing on the Receiver keeps it until it stops, or after
+                                             # this many minutes paused; 0 = any device controls it at any time
     source: str = ""                         # which file the configuration came from
 
     # ---- derived values

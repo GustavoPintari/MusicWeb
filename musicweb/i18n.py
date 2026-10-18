@@ -19,6 +19,10 @@ EN = {
     "O LRCLIB pediu para esperar um pouco. Tente de novo daqui a alguns segundos.":
         "LRCLIB asked us to wait a bit. Try again in a few seconds.",
     "Não consegui falar com o LRCLIB": "Couldn't reach LRCLIB",
+    # Receiver in use by another device
+    "outro dispositivo": "another device",
+    "{player} está tocando para {who}. Para ouvir sem atrapalhar, toque em \"{player}\" e escolha este dispositivo.":
+        "{player} is playing for {who}. To listen without interrupting, tap \"{player}\" to play on this device.",
     # radio
     "Não consegui falar com o Radio Browser": "Couldn't reach Radio Browser",
     "Rádio não encontrada": "Station not found",
