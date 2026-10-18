@@ -15,7 +15,10 @@ function show(s){
   const prevId=S.track?.id,prevLive=S.track?.live;S=s;recvAt=performance.now();
   $("#pp").innerHTML=s.state==="playing"?PAUSE:PLAY;
   $("#bar").classList.toggle("playing",s.state==="playing");
-  $("#sh").classList.toggle("on",!!s.shuffle);$("#sh").setAttribute("aria-pressed",!!s.shuffle);
+  const busy=mode==="remote"&&s.owner&&!s.owner.you;      // another device is playing on the Receiver
+  $("#bar").classList.toggle("locked",!!busy);
+  const note=busy?"🔒 "+T("Em uso por {who}",{who:s.owner.name}):"";if($("#note").textContent!==note)$("#note").textContent=note;
+  $("#sh").classList.toggle("on",!!s.shuffle);$("#sh").setAttribute("aria-pressed",!!s.shuffle);moreShow();
   repShow(s.repeat);
   if($("#err").textContent!==(s.error||"")){$("#err").textContent=s.error||"";fitBar()}
   if(s.track?.id!==prevId){
@@ -60,8 +63,11 @@ const REP_ICON='<svg viewBox="0 0 24 24"><path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm1
 const REP1_ICON='<svg viewBox="0 0 24 24"><path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4zm-4-2V9h-1l-2 1v1h1.5v4H13z"/></svg>';
 function repShow(r){
   r=REP.includes(r)?r:"off";const b=$("#rp");if(b.dataset.r===r)return;
-  b.dataset.r=r;b.innerHTML=r==="one"?REP1_ICON:REP_ICON;b.classList.toggle("on",r!=="off");b.title=T(REPNAME[r]);
+  b.dataset.r=r;b.querySelector("i").innerHTML=r==="one"?REP1_ICON:REP_ICON;b.querySelector("span").textContent=T(REPNAME[r]);
+  b.classList.toggle("on",r!=="off");moreShow();
 }
+// "⋯" opens a row with shuffle, repeat and the visualizer; it gets a dot while shuffle or repeat is on
+function moreShow(){$("#more").classList.toggle("dot",$("#sh").classList.contains("on")||$("#rp").classList.contains("on"))}
 // queue index after the current track on this device (same rules as the server's next_pos)
 function localNext(skip){
   if(L.repeat==="one"&&!skip)return L.pos;
@@ -203,7 +209,7 @@ const ctl={
     else api("prev",null,btn)},
   shuffle(btn){const on=!S.shuffle;toast(on?T("Ordem aleatória ligada"):T("Ordem aleatória desligada"),1500);
     if(mode==="local"){navigator.vibrate?.(10);localShuffle(on);return Promise.resolve()}
-    S.shuffle=on;$("#sh").classList.toggle("on",on);return api("shuffle",{on},btn)},
+    S.shuffle=on;$("#sh").classList.toggle("on",on);moreShow();return api("shuffle",{on},btn)},
   repeat(btn){const r=REP[(REP.indexOf(S.repeat||"off")+1)%REP.length];toast(T(REPNAME[r]),1500);repShow(r);S.repeat=r;
     if(mode==="local"){navigator.vibrate?.(10);L.repeat=r;try{localStorage.setItem("lrep",r)}catch(e){};lshow();return Promise.resolve()}
     return api("repeat",{mode:r},btn)},
@@ -227,16 +233,19 @@ async function switchOutput(){
   navigator.vibrate?.(10);$("#out").classList.add("busy");
   try{
     if(mode==="remote"){
-      let st=null;try{st=await (await fetch("/api/status")).json()}catch(e){}
+      let st=null;try{st=await (await fetch("/api/status",{headers:HDR})).json()}catch(e){}
       mode="local";try{localStorage.setItem("out",mode)}catch(e){}
-      const ti=st?.track&&st.state!=="stopped"&&trackById[st.track.id];
+      const mine=!st?.owner||st.owner.you;   // another device's music stays on the Receiver; this one starts empty
+      const ti=mine&&st?.track&&st.state!=="stopped"&&trackById[st.track.id];
       if(ti){
         const q=ti.a.tracks.map(t=>t.id),playing=st.state==="playing";
-        fetch("/api/pause",{method:"POST"});
+        fetch("/api/pause",{method:"POST",headers:HDR,body:'{"release":true}'});   // and frees the Receiver
         localStart(q,q.indexOf(ti.t.id),st.time||0,playing);
       }else show(localStatus());
       toast(T("Tocando neste dispositivo"));
     }else{
+      let st=null;try{st=await (await fetch("/api/status",{headers:HDR})).json()}catch(e){}
+      if(st?.owner&&!st.owner.you){toast(T("{name} está tocando para {who}. Continue ouvindo neste dispositivo.",{name:playerName,who:st.owner.name}),6000);return}
       const ti=L.pos>=0&&trackById[L.queue[L.pos]],playing=!au.paused,t=au.currentTime||0;
       au.pause();mode="remote";try{localStorage.setItem("out",mode)}catch(e){}
       S={state:"stopped"};

@@ -11,6 +11,8 @@ const EN={
   "Ordem aleatória":"Shuffle","Ordem aleatória ligada":"Shuffle on","Ordem aleatória desligada":"Shuffle off",
   "Espaço":"Space","tocar/pausar":"play/pause","faixa anterior/próxima":"previous/next track","mudo":"mute",
   "ordem aleatória":"shuffle","repetir":"repeat","letra":"lyrics","visualizador":"visualizer","tela cheia":"full screen","fechar":"close",
+  "Mais opções":"More options","Em uso por {who}":"In use by {who}",
+  "{name} está tocando para {who}. Continue ouvindo neste dispositivo.":"{name} is playing for {who}. Keep listening on this device.",
   "Repetir desligado":"Repeat off","Repetir a fila":"Repeat queue","Repetir a faixa":"Repeat track","Fechar player":"Close player",
   "Mudo":"Muted","Som ligado":"Sound on",
   "Tela cheia":"Full screen","Sair da tela cheia":"Exit full screen",

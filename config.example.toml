@@ -23,6 +23,8 @@ replaygain = "album"          # volume leveling from ReplayGain tags: "album", "
 
 [player]
 resume_on_start = false       # after a restart, play the saved queue right away (false = wait for "play")
+lock_minutes = 10             # only the device playing on the Receiver controls it, until it stops or stays paused
+                              # this long; 0 = any device controls it at any time
 
 [history]
 enabled = true                # record plays for "Histórico" and "Mais tocadas"

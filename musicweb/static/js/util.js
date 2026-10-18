@@ -14,13 +14,22 @@ const fmt=s=>{s=Math.max(0,Math.floor(s||0));const h=Math.floor(s/3600),m=Math.f
 const hue=s=>{let h=0;for(const c of s)h=(h*31+c.charCodeAt(0))%360;return h};
 const cover=(a,cls="",eager=false)=>`<div class="cv ${cls}" style="--ph:hsl(${hue((a.name||"")+(a.artist||""))} 35% 28%)">${esc(((a.name||"").match(/[\p{L}\p{N}]/u)||["♪"])[0].toUpperCase())}<img loading="${eager?"eager":"lazy"}" src="/api/cover/${a.id}?v=${a.cv||0}" onload="this.classList.add('ok')" onerror="this.remove()" alt=""></div>`;
 
+// id of this browser, sent with every request: while a device plays on the Receiver, only it controls it
+let CID="";try{CID=localStorage.getItem("cid")||""}catch(e){}
+if(!CID){CID=Date.now().toString(36)+Math.random().toString(36).slice(2,10);try{localStorage.setItem("cid",CID)}catch(e){}}
+const HDR={"X-Client":CID};
+
 async function api(p,body,btn){
   btn?.classList.add("busy");navigator.vibrate?.(10);
   try{
     let r;
-    try{r=await fetch("/api/"+p,{method:"POST",body:JSON.stringify(body||{})})}
+    try{r=await fetch("/api/"+p,{method:"POST",headers:HDR,body:JSON.stringify(body||{})})}
     catch(e){$("#err").textContent=T("Sem conexão com o servidor");return}
-    try{show(await r.json())}catch(e){console.error(e);$("#err").textContent=T("Erro na página: ")+e.message}
+    try{
+      const j=await r.json();
+      if(r.status===409){toast(j.error,6000);j.error=""}   // the Receiver is in use by another device
+      show(j);
+    }catch(e){console.error(e);$("#err").textContent=T("Erro na página: ")+e.message}
   }finally{btn?.classList.remove("busy")}
 }
 

@@ -146,7 +146,16 @@ addEventListener("keydown",e=>{
 $("#rs").onclick=async e=>{const b=e.currentTarget;await api("rescan",null,b);b.classList.add("busy");await load();b.classList.remove("busy")};
 
 let volDragging=false,volTimer=null;
-$("#vol").onclick=e=>{navigator.vibrate?.(10);$("#volpop").classList.toggle("open");e.currentTarget.classList.toggle("on");fitBar()};
+// the volume row and the "⋯" row open below the controls, one at a time
+function popRow(btn,row){
+  navigator.vibrate?.(10);const open=!$(row).classList.contains("open");
+  for(const [b,r] of [["#vol","#volpop"],["#more","#morepop"]]){
+    const on=open&&r===row;$(r).classList.toggle("open",on);$(b).classList.toggle("on",on);$(b).setAttribute("aria-expanded",on);
+  }
+  fitBar();
+}
+$("#vol").onclick=()=>popRow("#vol","#volpop");
+$("#more").onclick=()=>popRow("#more","#morepop");
 $("#vr").oninput=e=>{volDragging=true;const v=+e.target.value;volSet(v);
   clearTimeout(volTimer);volTimer=setTimeout(()=>ctl.volume(v).finally(()=>volDragging=false),120)};
 $("#vdn").onclick=e=>ctl.volDelta(-5,e.currentTarget);
@@ -164,7 +173,7 @@ async function load(){
 }
 async function poll(){
   try{
-    const st=await (await fetch("/api/status")).json();
+    const st=await (await fetch("/api/status",{headers:HDR})).json();
     if(mode==="local"){if(st.lib!=null&&libVer!=null&&st.lib!==libVer){libVer=st.lib;load()}return}
     show(st);
   }catch(e){}

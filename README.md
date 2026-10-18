@@ -16,6 +16,7 @@ It only needs the Python standard library. `mutagen` is optional and unlocks ext
 
 - **Library** by albums or artists, with search, format/quality badges (FLAC 24/96, MP3 320k…) and automatic refresh when new music is added.
 - **Two audio outputs**: 📻 *Receiver* (mpv on the phone) or 📱 *Este dispositivo* ("this device", the browser). You can switch mid-song without losing your place.
+- 🔒 **One device at a time on the Receiver**: while a device plays on it, the others see what's playing but can't change it (they can still listen on their own output). It frees up when that device stops, switches to its own output or stays paused for `[player] lock_minutes`.
 - **Covers** from the album folder, the tags or the internet (iTunes / MusicBrainz / Deezer); upload or search for a different one.
 - **Edit tags** (album, artist, year, tracks) and **remove albums** (they go to a trash folder).
 - **Download** a whole album as a `.zip`.
@@ -110,6 +111,7 @@ The file is looked up in this order: `--config`, the `MUSICWEB_CONFIG` variable,
 | `[covers] online` | `true` | look up covers online |
 | `[lyrics] online` | `true` | look up lyrics on LRCLIB |
 | `[player] resume_on_start` | `false` | after a restart, play the saved queue right away |
+| `[player] lock_minutes` | `10` | only the device playing on the Receiver controls it, until it stops or stays paused this long; `0` = any device, any time |
 | `[history] enabled` | `true` | record plays (history and most played) |
 | `[history] min_seconds` | `30` | listening time before a track counts as played (half the track if shorter) |
 | `[cache] dir` | `~/.cache/musicweb` | covers and lyrics (disposable) |
@@ -241,6 +243,7 @@ Só usa a biblioteca padrão do Python. O `mutagen` é opcional e libera recurso
 
 - **Biblioteca** por álbuns ou artistas, com busca, formato/qualidade (FLAC 24/96, MP3 320k…) e atualização automática quando entram músicas novas.
 - **Duas saídas de áudio**: 📻 *Receiver* (o mpv no celular) ou 📱 *Este dispositivo* (o navegador). Dá para trocar no meio da música sem perder o ponto.
+- 🔒 **Um dispositivo por vez no Receiver**: enquanto um dispositivo toca nele, os outros veem o que está tocando mas não conseguem mudar (podem ouvir na própria saída). Ele é liberado quando esse dispositivo para, troca para a própria saída ou fica pausado por `[player] lock_minutes`.
 - **Capas** da pasta do álbum, das tags ou da internet (iTunes / MusicBrainz / Deezer); dá para enviar ou buscar outra capa.
 - **Editar tags** (álbum, artista, ano, faixas) e **remover álbuns** (vão para uma lixeira).
 - **Baixar** o álbum inteiro em `.zip`.
@@ -335,6 +338,7 @@ O arquivo é procurado nesta ordem: `--config`, variável `MUSICWEB_CONFIG`, `./
 | `[covers] online` | `true` | busca capas na internet |
 | `[lyrics] online` | `true` | busca letras no LRCLIB |
 | `[player] resume_on_start` | `false` | depois de reiniciar, já toca a fila salva |
+| `[player] lock_minutes` | `10` | só o dispositivo que está tocando no Receiver o controla, até parar ou ficar pausado esse tempo; `0` = qualquer um, a qualquer hora |
 | `[history] enabled` | `true` | registra as reproduções (histórico e mais tocadas) |
 | `[history] min_seconds` | `30` | tempo ouvindo até a música contar como tocada (metade da faixa, se for mais curta) |
 | `[cache] dir` | `~/.cache/musicweb` | capas e letras (descartável) |
