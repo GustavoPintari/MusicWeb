@@ -9,12 +9,41 @@
 #
 # ~/.termux/boot/musicweb.sh is a symlink to this file, so there is a single copy to keep up to date.
 
-SELF=$(readlink -f "$0" 2>/dev/null || echo "$0")
-DIR=$(cd "$(dirname "$SELF")" && pwd)
 RUN="$HOME/.cache/musicweb"
 PIDFILE="$RUN/server.pid"
 LOG="$RUN/server.log"
 BOOT="$HOME/.termux/boot/musicweb.sh"
+
+# Real path of this script, following symlinks (e.g. ~/.termux/boot/musicweb.sh -> project).
+resolve() {
+    r=$(readlink -f "$1" 2>/dev/null) && [ -n "$r" ] && { echo "$r"; return; }
+    r=$(realpath "$1" 2>/dev/null) && [ -n "$r" ] && { echo "$r"; return; }
+    p=$1 i=0
+    while [ -L "$p" ] && [ $i -lt 20 ]; do       # no readlink -f / realpath: follow the links by hand
+        t=$(readlink "$p")
+        case $t in /*) p=$t ;; *) p=$(dirname "$p")/$t ;; esac
+        i=$((i+1))
+    done
+    echo "$p"
+}
+SELF=$(resolve "$0")
+DIR=$(cd "$(dirname "$SELF")" 2>/dev/null && pwd)
+# Not in the project (e.g. a plain copy in ~/.termux/boot): use $MUSICWEB_DIR or the folder of the last run.
+if [ ! -f "$DIR/server.py" ]; then
+    for d in "$MUSICWEB_DIR" "$(cat "$RUN/project_dir" 2>/dev/null)"; do
+        if [ -n "$d" ] && [ -f "$d/server.py" ]; then
+            DIR=$d SELF=$d/musicweb.sh
+            break
+        fi
+    done
+fi
+if [ ! -f "$DIR/server.py" ]; then
+    echo "Não achei a pasta do MusicWeb (procurei server.py em ${DIR:-?})." >&2
+    echo "Rode de dentro da pasta do projeto, por exemplo: cd ~/MusicWeb && ./musicweb.sh boot on" >&2
+    exit 1
+fi
+mkdir -p "$RUN"
+echo "$DIR" > "$RUN/project_dir"                 # remembered for the fallback above
 
 python_bin() {
     PY=${PYTHON:-$(command -v python || command -v python3)}
@@ -97,8 +126,10 @@ do_status() {
     else
         echo "musicweb: parado"
     fi
-    if [ -L "$BOOT" ] || [ -f "$BOOT" ]; then
-        echo "início com o celular: ativado"
+    if [ -L "$BOOT" ]; then
+        echo "início com o celular: ativado ($BOOT -> $(readlink "$BOOT"))"
+    elif [ -f "$BOOT" ]; then
+        echo "início com o celular: ativado, mas $BOOT é uma cópia; troque por um link: ./musicweb.sh boot on"
     else
         echo "início com o celular: desativado  (./musicweb.sh boot on)"
     fi
@@ -111,9 +142,10 @@ do_boot() {
     case "$1" in
         on)
             mkdir -p "$(dirname "$BOOT")"
-            chmod +x "$SELF"
-            ln -sf "$SELF" "$BOOT"
-            echo "Início com o celular ativado: $BOOT -> $SELF"
+            chmod +x "$DIR/musicweb.sh"
+            rm -f "$BOOT"                          # replaces an old copy or link
+            ln -s "$DIR/musicweb.sh" "$BOOT"
+            echo "Início com o celular ativado: $BOOT -> $DIR/musicweb.sh"
             echo "Precisa do app Termux:Boot (da mesma loja do Termux: F-Droid ou GitHub), aberto uma vez."
             ;;
         off)
