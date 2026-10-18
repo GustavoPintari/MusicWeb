@@ -26,7 +26,9 @@ It only needs the Python standard library. `mutagen` is optional and unlocks ext
 - 🎨 **Album colors**: opening an album paints the background with a gradient from its cover's dominant color.
 - **Gapless playback and ReplayGain** on the Receiver (mpv).
 - 🔀 **Shuffle** on either output: the rest of the queue gets a random order without stopping the current track; turning it off goes back to the original order.
-- ⛶ **Full screen player** on desktop: big cover, visualizer and controls over a blurred copy of the cover (Esc goes back, space plays/pauses).
+- 🔁 **Repeat** the queue or the current track (on either output).
+- ⛶ **Expanded player**: big cover, visualizer and every control over a blurred copy of the cover, with the lyrics beside it. On desktop it goes full screen (button or `F`); on phones and tablets it opens with a tap on the track and closes with ⌄, a swipe down or *back*.
+- ⌨️ **Keyboard shortcuts**: space play/pause, ← → seek 5 s, Shift+← → previous/next track, + − volume, M mute, S shuffle, R repeat, L lyrics, V visualizer, F full screen, Esc close, ? lists them.
 - **Queue survives restarts**: after a reboot or crash, the queue comes back paused where it stopped — press play to continue.
 - **Interface in Portuguese (BR) or English** (`[interface] language`).
 - **Fast startup** on large libraries: tags are read once and cached in SQLite; later scans only read new or changed files.
@@ -249,7 +251,9 @@ Só usa a biblioteca padrão do Python. O `mutagen` é opcional e libera recurso
 - 🎨 **Cores do disco**: ao abrir um álbum, o fundo ganha um degradê com a cor dominante da capa.
 - **Reprodução sem pausa entre faixas (gapless) e ReplayGain** no Receiver (mpv).
 - 🔀 **Ordem aleatória** nas duas saídas: o resto da fila é embaralhado sem parar a faixa atual; ao desligar, volta à ordem original.
-- ⛶ **Player em tela cheia** no computador: capa grande, visualizador e controles sobre a capa desfocada (Esc volta, espaço toca/pausa).
+- 🔁 **Repetir** a fila ou a faixa atual (nas duas saídas).
+- ⛶ **Player expandido**: capa grande, visualizador e todos os controles sobre a capa desfocada, com a letra ao lado. No computador vai para a tela cheia (botão ou `F`); no celular e no tablet abre com um toque na faixa e fecha com ⌄, deslizando para baixo ou com *voltar*.
+- ⌨️ **Atalhos de teclado**: espaço toca/pausa, ← → pula 5 s, Shift+← → faixa anterior/próxima, + − volume, M mudo, S ordem aleatória, R repetir, L letra, V visualizador, F tela cheia, Esc fecha, ? mostra a lista.
 - **Fila que sobrevive a reinício**: depois de religar o celular ou de uma queda, a fila volta pausada onde parou — é só apertar play.
 - **Interface em português (BR) ou inglês** (`[interface] language`).
 - **Inicialização rápida** em bibliotecas grandes: as tags são lidas uma vez e guardadas no SQLite; as varreduras seguintes só leem arquivos novos ou alterados.

@@ -10,7 +10,7 @@ from .history import record_play, stats
 from .i18n import _
 from .library import library_json, scan
 from .lyrics import get_lyrics
-from .player import mpv_cmd, pause, play_pos, resume, seek, set_queue, set_shuffle, status, stop
+from .player import mpv_cmd, pause, play_pos, resume, next_pos, seek, set_queue, set_repeat, set_shuffle, status, stop
 from .retro import periods as retro_periods, retro
 from .state import albums, item, lock, state, tracks
 from .util import MIME, sniff, zip_name
@@ -254,7 +254,9 @@ class H(BaseHTTPRequestHandler):
         elif p == "/api/stop":
             stop()
         elif p == "/api/next":
-            play_pos(state["pos"] + 1)
+            with lock:
+                nxt = next_pos(skip=True)
+            play_pos(nxt)
         elif p == "/api/prev":
             with lock:
                 restored = None if state["active"] else state["restored"]
@@ -263,6 +265,8 @@ class H(BaseHTTPRequestHandler):
                 seek(0)
             else:
                 play_pos(max(0, state["pos"] - 1))
+        elif p == "/api/repeat":
+            set_repeat(str(body.get("mode", "")))
         elif p == "/api/shuffle":
             set_shuffle(bool(body.get("on")))
         elif p == "/api/seek":

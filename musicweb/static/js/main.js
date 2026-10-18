@@ -16,13 +16,27 @@ $("#lib").onclick=e=>{
 function openSheet(id){
   const wasOpen=$("#sheet").classList.contains("open");
   openAlbum=id;editing=false;renderSheet();$("#sheet").scrollTop=0;$("#sheet").classList.remove("scrolled");$("#sheet").classList.add("open");
-  if(!wasOpen)history.pushState({sheet:1},"");
-  $("#lyb").classList.toggle("on",id==="@ly");
+  if(!wasOpen)pushLayer("sheet");
+  $("#lyb").classList.toggle("on",id==="@ly");$("#sheet").classList.toggle("lyr",id==="@ly");fitBar();
 }
-function closeSheet(){$("#sheet").classList.remove("open");openAlbum=null;editing=false;$("#lyb").classList.remove("on");setTint()}
+function closeSheet(){$("#sheet").classList.remove("open","lyr");openAlbum=null;editing=false;$("#lyb").classList.remove("on");setTint();fitBar()}
 $("#back").onclick=()=>history.back();
+
+// The album page (sheet) and the expanded player are layers in the browser history, so "back" (Android's button,
+// the browser's) closes the top one. layers: what each history entry we pushed opened, oldest first.
+const layers=[];let afterPop=null,popCount=0;
+function pushLayer(l){layers.push(l);history.pushState({[l]:1},"")}
+function closeLayers(n,then){                // goes back n entries, then runs "then"
+  if(n<=0){then?.();return}
+  afterPop=then;popCount=n;history.go(-n);
+}
 $("#sheet").addEventListener("scroll",e=>e.target.classList.toggle("scrolled",e.target.scrollTop>4),{passive:true});
-window.onpopstate=closeSheet;
+window.onpopstate=()=>{
+  const n=popCount||1;popCount=0;
+  if(!layers.length){closeSheet();fullOff()}
+  for(let i=0;i<n&&layers.length;i++)layers.pop()==="full"?fullOff():closeSheet();
+  const f=afterPop;afterPop=null;f?.();
+};
 $("#sheetBody").onclick=e=>{
   const fv=e.target.closest("[data-fav]");if(fv){toggleFav(fv.dataset.fav,fv);return}
   const rr=e.target.closest(".rr");if(rr){playRadio(rr.dataset.r,rr);return}
@@ -54,33 +68,80 @@ $("#sheetBody").onsubmit=e=>{
   if(e.target.id==="lyf"){e.preventDefault();e.target.querySelector("button").classList.add("busy");
     fetchLyrics(LY.tid,$("#lya").value.trim(),$("#lyt").value.trim())}
 };
-$("#now").onclick=()=>{if(!S.track)return;fullPlayer(false);if(!$("#sheet").classList.contains("open"))openSheet(byId[S.track.album]?S.track.album:"@radio")};
+// tap on the track: with a mouse and a wide window it opens the album page; elsewhere (phone, tablet) the
+// expanded player; in the expanded player, the album page
+$("#now").onclick=()=>{
+  if(!S.track)return;
+  const page=()=>{if(openAlbum!=="@ly"&&$("#sheet").classList.contains("open"))return;openSheet(byId[S.track.album]?S.track.album:"@radio")};
+  if(isFull())leaveFull(page);else if(bigScreen.matches)page();else enterFull();
+};
 $("#rdb").onclick=()=>openSheet("@radio");
-$("#lyb").onclick=()=>{navigator.vibrate?.(10);fullPlayer(false);if(openAlbum==="@ly")history.back();else openSheet("@ly")};
+$("#lyb").onclick=()=>{navigator.vibrate?.(10);if(openAlbum==="@ly")history.back();else openSheet("@ly")};   // in the expanded player too
 $("#pp").onclick=e=>ctl.toggle(e.currentTarget);
 $("#nx").onclick=e=>ctl.next(e.currentTarget);
 $("#pv").onclick=e=>ctl.prev(e.currentTarget);
 $("#st").onclick=e=>ctl.stop(e.currentTarget);
 $("#sh").onclick=e=>ctl.shuffle(e.currentTarget);
+$("#rp").onclick=e=>ctl.repeat(e.currentTarget);
 
-// full screen player (desktop): the bar takes the whole window, with the cover big; the browser goes full screen
-// too when it allows it. Esc (or the same button) goes back.
+// expanded player: the bar takes the whole window, with the cover big and every control. On desktop (#fs button,
+// F) the browser goes full screen too when it allows it; on a phone it opens with a tap on the track and closes
+// with ⌄, a swipe down or "back". The lyrics (Letra) open beside the cover (below the title on a phone).
+const bigScreen=matchMedia("(hover:hover) and (pointer:fine) and (min-width:820px)");
 const FS_ON='<svg viewBox="0 0 24 24"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>';
 const FS_OFF='<svg viewBox="0 0 24 24"><path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"/></svg>';
-function fullPlayer(on){
-  if(document.body.classList.contains("full")===on)return;
+const isFull=()=>document.body.classList.contains("full");
+function fullView(on){
   document.body.classList.toggle("full",on);
   const b=$("#fs");b.innerHTML=on?FS_OFF:FS_ON;b.title=T(on?"Sair da tela cheia":"Tela cheia");b.classList.toggle("on",on);
-  if(on)document.documentElement.requestFullscreen?.().catch(()=>{});
-  else if(document.fullscreenElement)document.exitFullscreen().catch(()=>{});
   fitBar();vizWake();
+  if(openAlbum==="@ly"&&LY.idx>=0)setTimeout(()=>document.querySelector(`.ly p[data-i="${LY.idx}"]`)?.scrollIntoView({block:"center"}),50);
 }
-$("#fs").onclick=()=>fullPlayer(!document.body.classList.contains("full"));
-document.addEventListener("fullscreenchange",()=>{if(!document.fullscreenElement)fullPlayer(false)});   // Esc in browser full screen
+function enterFull(){
+  if(isFull()||!S.track&&!bigScreen.matches)return;
+  navigator.vibrate?.(10);pushLayer("full");fullView(true);
+  if(bigScreen.matches)document.documentElement.requestFullscreen?.().catch(()=>{});
+}
+function fullOff(){                         // called when its history entry is gone
+  if(!isFull())return;
+  fullView(false);
+  if(document.fullscreenElement)document.exitFullscreen().catch(()=>{});
+}
+function leaveFull(then){                   // closes the expanded player and whatever was opened on top of it
+  const i=layers.lastIndexOf("full");
+  if(i<0){fullOff();then?.();return}
+  closeLayers(layers.length-i,then);
+}
+$("#fs").onclick=()=>isFull()?leaveFull():enterFull();
+$("#fdn").onclick=()=>leaveFull();
+document.addEventListener("fullscreenchange",()=>{if(!document.fullscreenElement&&isFull())leaveFull()});   // Esc in browser full screen
+let swipe=null;                             // phone: swipe down on the expanded player closes it
+$("#bar").addEventListener("touchstart",e=>{swipe=isFull()&&!e.target.closest("#prog,#volpop,.ctl")?{y:e.touches[0].clientY,t:performance.now()}:null},{passive:true});
+$("#bar").addEventListener("touchend",e=>{
+  if(swipe&&e.changedTouches[0].clientY-swipe.y>90&&performance.now()-swipe.t<600)leaveFull();
+  swipe=null;
+},{passive:true});
+
+// keyboard shortcuts (anywhere on the page, except while typing)
+const KEYS=[["Espaço","tocar/pausar"],["← →","5 s"],["Shift+← →","faixa anterior/próxima"],["+ −","volume"],["M","mudo"],
+  ["S","ordem aleatória"],["R","repetir"],["L","letra"],["V","visualizador"],["F","tela cheia"],["Esc","fechar"]];
 addEventListener("keydown",e=>{
-  if(!document.body.classList.contains("full")||e.target.closest("input,textarea"))return;
-  if(e.key==="Escape")fullPlayer(false);
-  else if(e.key===" "){e.preventDefault();ctl.toggle($("#pp"))}
+  if(e.ctrlKey||e.metaKey||e.altKey||e.target.closest?.("input,textarea,select,[contenteditable]"))return;
+  const k=e.key.length===1?e.key.toLowerCase():e.key,full=isFull();
+  const seekBy=d=>{const [t,dur]=curTime();if(S.track&&!S.track.radio&&dur)ctl.seek(Math.max(0,Math.min(dur-1,t+d)))};
+  const act={
+    " ":()=>ctl.toggle($("#pp")),k:()=>ctl.toggle($("#pp")),
+    ArrowLeft:()=>e.shiftKey?ctl.prev($("#pv")):seekBy(-5),ArrowRight:()=>e.shiftKey?ctl.next($("#nx")):seekBy(5),
+    "+":()=>ctl.volDelta(5),"=":()=>ctl.volDelta(5),"-":()=>ctl.volDelta(-5),
+    ArrowUp:full&&(()=>ctl.volDelta(5)),ArrowDown:full&&(()=>ctl.volDelta(-5)),
+    m:()=>{const on=(S.volume??100)>0;ctl.mute();toast(T(on?"Mudo":"Som ligado"),1200)},
+    s:()=>ctl.shuffle($("#sh")),r:()=>ctl.repeat($("#rp")),l:()=>$("#lyb").click(),v:()=>$("#vzb").click(),
+    f:bigScreen.matches&&(()=>$("#fs").click()),
+    Escape:()=>{if(full)leaveFull();else if($("#sheet").classList.contains("open"))history.back()},
+    "?":()=>toast(KEYS.map(([a,b])=>`${T(a)}: ${T(b)}`).join(" · "),9000),
+  }[k];
+  if(!act)return;
+  e.preventDefault();act();
 });
 $("#rs").onclick=async e=>{const b=e.currentTarget;await api("rescan",null,b);b.classList.add("busy");await load();b.classList.remove("busy")};
 
