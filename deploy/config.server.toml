@@ -1,0 +1,44 @@
+# musicweb configuration for the container (Containerfile / deploy/musicweb.container).
+# Paths are the ones inside the container; the Quadlet maps them to the server's folders.
+# To change something, copy this file to /storage/apps/musicweb/config.toml and restart (see the README).
+
+[server]
+host = "0.0.0.0"              # inside the container; the Quadlet only publishes it on 127.0.0.1
+port = 8095
+player_name = "Receiver"      # name of the server audio output (the P2 jack), shown on the page
+
+[interface]
+language = "pt-BR"
+
+[library]
+music_dir = "/music"
+rescan_every = 60
+trash_dir = "/trash"          # removed albums: outside /music, so neither MusicWeb nor Lidarr scan them
+
+[mpv]
+audio_output = "alsa"         # straight to the sound card: no PulseAudio/PipeWire on the server
+# The analog output of the motherboard (green P2 jack at the back / headphones at the front).
+# CARD=PCH is the Intel onboard audio; list the others with: podman exec musicweb mpv --audio-device=help
+audio_device = "alsa/plughw:CARD=PCH,DEV=0"
+gapless = true
+replaygain = "album"
+
+[player]
+resume_on_start = false
+lock_minutes = 10
+
+[history]
+enabled = true
+min_seconds = 30
+
+[covers]
+online = true
+
+[lyrics]
+online = true
+
+[cache]
+dir = "/cache"
+
+[data]
+dir = "/data"

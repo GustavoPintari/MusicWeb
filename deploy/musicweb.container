@@ -1,0 +1,38 @@
+# Quadlet for rootless Podman: ~/.config/containers/systemd/musicweb.container
+#   systemctl --user daemon-reload && systemctl --user start musicweb
+# Web page on 127.0.0.1:8095 (publish it with: tailscale serve --bg --https=8451 http://127.0.0.1:8095).
+# The "Receiver" output plays on the server's sound card (P2 jack): the user needs to be in the "audio" group.
+
+[Unit]
+Description=MusicWeb (player web; saída Receiver na P2 do servidor)
+Wants=network-online.target
+After=network-online.target
+
+[Container]
+ContainerName=musicweb
+Image=localhost/musicweb:latest
+PublishPort=127.0.0.1:8095:8095
+Timezone=local
+# sound card: /dev/snd from the host, with the user's groups (audio) kept inside the container
+AddDevice=/dev/snd
+GroupAdd=keep-groups
+# no SELinux on Debian, so this changes nothing there; on Fedora/RHEL it is what lets the container open /dev/snd
+SecurityLabelDisable=true
+# init process: reaps mpv and passes on SIGTERM
+PodmanArgs=--init
+Volume=/srv/media/music:/music
+Volume=/srv/media/.musicweb-lixeira:/trash
+Volume=/storage/apps/musicweb/data:/data
+Volume=/storage/apps/musicweb/cache:/cache
+# optional: your own config (copy deploy/config.server.toml there first)
+# Volume=/storage/apps/musicweb/config.toml:/etc/musicweb/config.toml:ro
+
+[Service]
+ExecStartPre=/usr/local/sbin/wait-for-network.sh
+ExecStartPre=/usr/bin/mountpoint -q /srv/media
+Restart=always
+RestartSec=10
+TimeoutStartSec=300
+
+[Install]
+WantedBy=default.target

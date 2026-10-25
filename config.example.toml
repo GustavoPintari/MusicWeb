@@ -6,7 +6,7 @@
 [server]
 host = "0.0.0.0"              # "0.0.0.0" = accept connections from other devices on the network
 port = 8080
-player_name = "Receiver"      # name of the phone audio output, shown on the page
+player_name = "Receiver"      # name of the mpv audio output (phone or server), shown on the page
 
 [interface]
 language = "pt-BR"            # interface language: "pt-BR" (Português) or "en" (English)
@@ -17,7 +17,9 @@ rescan_every = 60             # seconds between checks for new music (0 disables
 trash_dir = ""                # empty = .musicweb-lixeira folder next to the library
 
 [mpv]
-audio_output = "opensles"     # mpv audio output (--ao)
+audio_output = ""             # mpv audio output (--ao); empty = "opensles" on Termux, mpv's choice elsewhere
+audio_device = ""             # mpv --audio-device; empty = default. On a server, e.g. "alsa/plughw:CARD=PCH,DEV=0"
+                              # (the P2 jack); list them with: mpv --audio-device=help
 gapless = true                # no pause between tracks (the next one is preloaded)
 replaygain = "album"          # volume leveling from ReplayGain tags: "album", "track" or "no"
 

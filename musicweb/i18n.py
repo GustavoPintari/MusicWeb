@@ -41,6 +41,8 @@ EN = {
     # playback
     "não encontrado": "not found",
     "mpv não conseguiu tocar: {err}": "mpv couldn't play: {err}",
+    "{player} não conseguiu abrir a saída de áudio ({device}); veja o log do servidor":
+        "{player} couldn't open the audio output ({device}); see the server log",
     "erro": "error",
 }
 

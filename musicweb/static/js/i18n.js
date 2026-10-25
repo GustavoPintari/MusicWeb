@@ -59,7 +59,7 @@ const EN={
   "Horário com mais músicas: {h}":"Busiest hour: {h}","Dia com mais músicas: {d}":"Busiest day: {d}","{n} reproduções":"{n} plays",
   "Reproduções por hora do dia":"Plays by hour of the day","Reproduções por dia da semana":"Plays by day of the week",
   "Nada tocado neste período.":"Nothing played in this period.",
-  "O server.py no celular está desatualizado.":"The server.py on the phone is outdated.","Copie a versão nova e reinicie o servidor.":"Copy the new version and restart the server.",
+  "O servidor do MusicWeb está desatualizado.":"The MusicWeb server is outdated.","Copie a versão nova e reinicie o servidor.":"Copy the new version and restart the server.",
 };
 const T=(s,v)=>{let r=LANG==="en"&&EN[s]||s;if(v)for(const k in v)r=r.split(`{${k}}`).join(v[k]);return r};
 function i18nStatic(){                      // texts written directly in index.html

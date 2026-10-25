@@ -15,7 +15,7 @@ It only needs the Python standard library. `mutagen` is optional and unlocks ext
 ### Features
 
 - **Library** by albums or artists, with search, format/quality badges (FLAC 24/96, MP3 320k…) and automatic refresh when new music is added.
-- **Two audio outputs**: 📻 *Receiver* (mpv on the phone) or 📱 *Este dispositivo* ("this device", the browser). You can switch mid-song without losing your place.
+- **Two audio outputs**: 📻 *Receiver* (mpv on the phone, or on the [server's sound card](#linux-server-podman)) or 📱 *Este dispositivo* ("this device", the browser). You can switch mid-song without losing your place.
 - 🔒 **One device at a time on the Receiver**: while a device plays on it, the others see what's playing but can't change it (they can still listen on their own output). It frees up when that device stops, switches to its own output or stays paused for `[player] lock_minutes`.
 - **Covers** from the album folder, the tags or the internet (iTunes / MusicBrainz / Deezer); upload or search for a different one.
 - **Edit tags** (album, artist, year, tracks) and **remove albums** (they go to a trash folder).
@@ -86,6 +86,52 @@ The log is at `~/.cache/musicweb/server.log`. `start` also enables `termux-wake-
 
 On some phones you also need to exclude Termux from battery optimization (Settings → Apps → Termux → Battery → Unrestricted) so it isn't killed.
 
+### Linux server (Podman)
+
+MusicWeb also runs in a container on a Linux server. The 📻 *Receiver* output then is the **server's sound card** — e.g. the P2 (3.5 mm) jack of the motherboard, wired to the receiver/speakers — played by mpv straight through ALSA (no PulseAudio/PipeWire needed). The files in [`deploy/`](deploy) assume rootless Podman with Quadlet, the music in `/srv/media/music` and the data in `/storage/apps/musicweb`; adjust the paths in `deploy/musicweb.container` if yours differ.
+
+**1. Sound card** (once, on the server):
+
+```bash
+sudo apt install alsa-utils
+sudo usermod -aG audio $USER        # the container reaches /dev/snd through this group
+aplay -l                            # the onboard audio shows up as card "PCH" (device 0 = analog / P2)
+amixer -c PCH sset Master 100% unmute
+amixer -c PCH sset Headphone 100% unmute   # front jack (names vary by board: alsamixer -c PCH shows them)
+amixer -c PCH sset Front 100% unmute       # green jack at the back
+sudo alsactl store                  # keeps these levels across reboots (alsa-utils restores them on boot)
+sudo reboot                         # so the user services pick up the "audio" group
+```
+
+**2. Folders, image and service:**
+
+```bash
+sudo zfs create storage/apps/musicweb && sudo chown $USER: /storage/apps/musicweb   # or a plain mkdir
+mkdir -p /storage/apps/musicweb/data /storage/apps/musicweb/cache /srv/media/.musicweb-lixeira
+git clone https://github.com/GustavoPintari/MusicWeb ~/MusicWeb && cd ~/MusicWeb
+podman build -t localhost/musicweb .
+cp deploy/musicweb.container ~/.config/containers/systemd/
+systemctl --user daemon-reload && systemctl --user start musicweb
+sudo tailscale serve --bg --https=8451 http://127.0.0.1:8095    # https://<server>.ts.net:8451
+```
+
+The page only listens on `127.0.0.1:8095`; `tailscale serve` publishes it on the tailnet (or point any reverse proxy at it). Removed albums go to `/srv/media/.musicweb-lixeira`, outside the library.
+
+**Configuration:** the image brings [`deploy/config.server.toml`](deploy/config.server.toml) (container paths, `audio_output = "alsa"`, `audio_device = "alsa/plughw:CARD=PCH,DEV=0"`). To change it, copy it to `/storage/apps/musicweb/config.toml`, uncomment the matching `Volume=` line in the Quadlet, then `systemctl --user daemon-reload && systemctl --user restart musicweb`. A single setting can also go in the Quadlet as `Environment=MPV_AUDIO_DEVICE=...`.
+
+**Update:** `cd ~/MusicWeb && git pull && podman build -t localhost/musicweb . && systemctl --user restart musicweb`.
+
+**Checking the sound:**
+
+```bash
+podman exec musicweb mpv --audio-device=help               # outputs mpv can see (use one in audio_device)
+podman exec musicweb speaker-test -D plughw:CARD=PCH,DEV=0 -c 2 -t wav -l 1   # "front left, front right" on the P2
+podman exec -it musicweb alsamixer -c PCH                   # mixer (M unmutes; Esc quits)
+journalctl --user -u musicweb -e                            # server log, with mpv's audio errors
+```
+
+If the card can't be opened, the page shows "Receiver couldn't open the audio output" and the log says why. `plughw` uses the card exclusively: another program playing on the same jack (e.g. PipeWire, if a desktop is installed later) leaves it "busy" — then use that program's output instead (`audio_output = "pipewire"` or `"pulse"`, with its socket mounted in the container).
+
 ### Configuration
 
 Copy the example and change what you need — everything is optional:
@@ -105,7 +151,8 @@ The file is looked up in this order: `--config`, the `MUSICWEB_CONFIG` variable,
 | `[library] music_dir` | `~/storage/music` | music folder |
 | `[library] rescan_every` | `60` | seconds between checks for new music (0 disables) |
 | `[library] trash_dir` | *(next to the library)* | where removed albums go |
-| `[mpv] audio_output` | `opensles` | mpv audio output (`--ao`) |
+| `[mpv] audio_output` | *(automatic)* | mpv audio output (`--ao`): `opensles` on Termux, mpv's choice elsewhere; `alsa` on the server |
+| `[mpv] audio_device` | *(default)* | mpv `--audio-device`, e.g. `alsa/plughw:CARD=PCH,DEV=0` (the server's P2 jack) |
 | `[mpv] gapless` | `true` | no pause between tracks (the next one is preloaded) |
 | `[mpv] replaygain` | `album` | volume leveling from ReplayGain tags: `album`, `track` or `no` |
 | `[covers] online` | `true` | look up covers online |
@@ -118,7 +165,7 @@ The file is looked up in this order: `--config`, the `MUSICWEB_CONFIG` variable,
 | `[data] dir` | `~/.local/share/musicweb` | `musicweb.db`: scan cache, play history and saved queue |
 
 **Priority:** defaults < `config.toml` < environment variables < command line.
-The older variables still work: `MPV_AO`, `COVERS_ONLINE`, `LYRICS_ONLINE`, `RESCAN_EVERY`, `PLAYER_NAME`, `TRASH`, `MUSIC_DIR`; plus `MUSICWEB_LANGUAGE`.
+The older variables still work: `MPV_AO`, `COVERS_ONLINE`, `LYRICS_ONLINE`, `RESCAN_EVERY`, `PLAYER_NAME`, `TRASH`, `MUSIC_DIR`; plus `MUSICWEB_LANGUAGE` and `MPV_AUDIO_DEVICE`.
 
 ### Organizing your music
 
@@ -168,6 +215,10 @@ server.py               shortcut: python server.py
 config.example.toml     configuration template
 requirements.txt        Python dependencies (mutagen)
 musicweb.sh             Termux control: start, stop, restart, status, log, install, boot on/off
+Containerfile           container image for a Linux server (mpv + ALSA)
+deploy/
+├── musicweb.container  Quadlet (rootless Podman service) with the sound card
+└── config.server.toml  configuration inside the container (P2 jack output)
 musicweb/
 ├── app.py              startup (arguments, configuration, threads)
 ├── info.py             `musicweb.sh status` details
@@ -242,7 +293,7 @@ Só usa a biblioteca padrão do Python. O `mutagen` é opcional e libera recurso
 ### Recursos
 
 - **Biblioteca** por álbuns ou artistas, com busca, formato/qualidade (FLAC 24/96, MP3 320k…) e atualização automática quando entram músicas novas.
-- **Duas saídas de áudio**: 📻 *Receiver* (o mpv no celular) ou 📱 *Este dispositivo* (o navegador). Dá para trocar no meio da música sem perder o ponto.
+- **Duas saídas de áudio**: 📻 *Receiver* (o mpv no celular, ou na [placa de som do servidor](#servidor-linux-podman)) ou 📱 *Este dispositivo* (o navegador). Dá para trocar no meio da música sem perder o ponto.
 - 🔒 **Um dispositivo por vez no Receiver**: enquanto um dispositivo toca nele, os outros veem o que está tocando mas não conseguem mudar (podem ouvir na própria saída). Ele é liberado quando esse dispositivo para, troca para a própria saída ou fica pausado por `[player] lock_minutes`.
 - **Capas** da pasta do álbum, das tags ou da internet (iTunes / MusicBrainz / Deezer); dá para enviar ou buscar outra capa.
 - **Editar tags** (álbum, artista, ano, faixas) e **remover álbuns** (vão para uma lixeira).
@@ -313,6 +364,52 @@ O log fica em `~/.cache/musicweb/server.log`. O `start` também ativa o `termux-
 
 Em alguns aparelhos também é preciso tirar o Termux da otimização de bateria (Configurações → Apps → Termux → Bateria → Sem restrições) para ele não ser encerrado.
 
+### Servidor Linux (Podman)
+
+O MusicWeb também roda em container num servidor Linux. A saída 📻 *Receiver* passa a ser a **placa de som do servidor** — por exemplo a saída P2 da placa‑mãe, ligada no receiver/caixas — tocada pelo mpv direto no ALSA (sem PulseAudio/PipeWire). Os arquivos em [`deploy/`](deploy) consideram Podman rootless com Quadlet, as músicas em `/srv/media/music` e os dados em `/storage/apps/musicweb`; ajuste os caminhos no `deploy/musicweb.container` se os seus forem outros.
+
+**1. Placa de som** (uma vez, no servidor):
+
+```bash
+sudo apt install alsa-utils
+sudo usermod -aG audio $USER        # o container acessa o /dev/snd por esse grupo
+aplay -l                            # o áudio da placa-mãe aparece como card "PCH" (device 0 = analógica / P2)
+amixer -c PCH sset Master 100% unmute
+amixer -c PCH sset Headphone 100% unmute   # P2 da frente (os nomes mudam por placa: alsamixer -c PCH mostra)
+amixer -c PCH sset Front 100% unmute       # P2 verde de trás
+sudo alsactl store                  # guarda esses níveis entre boots (o alsa-utils restaura no boot)
+sudo reboot                         # para os serviços do usuário pegarem o grupo "audio"
+```
+
+**2. Pastas, imagem e serviço:**
+
+```bash
+sudo zfs create storage/apps/musicweb && sudo chown $USER: /storage/apps/musicweb   # ou um mkdir comum
+mkdir -p /storage/apps/musicweb/data /storage/apps/musicweb/cache /srv/media/.musicweb-lixeira
+git clone https://github.com/GustavoPintari/MusicWeb ~/MusicWeb && cd ~/MusicWeb
+podman build -t localhost/musicweb .
+cp deploy/musicweb.container ~/.config/containers/systemd/
+systemctl --user daemon-reload && systemctl --user start musicweb
+sudo tailscale serve --bg --https=8451 http://127.0.0.1:8095    # https://<servidor>.ts.net:8451
+```
+
+A página só escuta em `127.0.0.1:8095`; o `tailscale serve` publica na tailnet (ou aponte um proxy reverso para ela). Álbuns removidos vão para `/srv/media/.musicweb-lixeira`, fora da biblioteca.
+
+**Configuração:** a imagem traz o [`deploy/config.server.toml`](deploy/config.server.toml) (caminhos do container, `audio_output = "alsa"`, `audio_device = "alsa/plughw:CARD=PCH,DEV=0"`). Para mudar, copie para `/storage/apps/musicweb/config.toml`, descomente a linha `Volume=` correspondente no Quadlet e rode `systemctl --user daemon-reload && systemctl --user restart musicweb`. Uma opção avulsa também pode ir no Quadlet como `Environment=MPV_AUDIO_DEVICE=...`.
+
+**Atualizar:** `cd ~/MusicWeb && git pull && podman build -t localhost/musicweb . && systemctl --user restart musicweb`.
+
+**Conferindo o som:**
+
+```bash
+podman exec musicweb mpv --audio-device=help               # saídas que o mpv enxerga (use uma em audio_device)
+podman exec musicweb speaker-test -D plughw:CARD=PCH,DEV=0 -c 2 -t wav -l 1   # "front left, front right" na P2
+podman exec -it musicweb alsamixer -c PCH                   # mixer (M tira do mudo; Esc sai)
+journalctl --user -u musicweb -e                            # log do servidor, com os erros de áudio do mpv
+```
+
+Se a placa não abrir, a página mostra "Receiver não conseguiu abrir a saída de áudio" e o log diz o motivo. O `plughw` usa a placa com exclusividade: outro programa tocando na mesma saída (por exemplo o PipeWire, se um dia instalar um desktop) a deixa "ocupada" — aí use a saída desse programa (`audio_output = "pipewire"` ou `"pulse"`, com o socket dele montado no container).
+
 ### Configuração
 
 Copie o exemplo e ajuste o que quiser — tudo é opcional:
@@ -332,7 +429,8 @@ O arquivo é procurado nesta ordem: `--config`, variável `MUSICWEB_CONFIG`, `./
 | `[library] music_dir` | `~/storage/music` | pasta das músicas |
 | `[library] rescan_every` | `60` | segundos entre buscas por músicas novas (0 desliga) |
 | `[library] trash_dir` | *(ao lado da biblioteca)* | para onde vão os álbuns removidos |
-| `[mpv] audio_output` | `opensles` | saída de áudio do mpv (`--ao`) |
+| `[mpv] audio_output` | *(automática)* | saída de áudio do mpv (`--ao`): `opensles` no Termux, a escolha do mpv nos outros; `alsa` no servidor |
+| `[mpv] audio_device` | *(padrão)* | `--audio-device` do mpv, por exemplo `alsa/plughw:CARD=PCH,DEV=0` (a P2 do servidor) |
 | `[mpv] gapless` | `true` | sem pausa entre as faixas (a próxima é pré-carregada) |
 | `[mpv] replaygain` | `album` | equaliza o volume pelas tags ReplayGain: `album`, `track` ou `no` |
 | `[covers] online` | `true` | busca capas na internet |
@@ -345,7 +443,7 @@ O arquivo é procurado nesta ordem: `--config`, variável `MUSICWEB_CONFIG`, `./
 | `[data] dir` | `~/.local/share/musicweb` | `musicweb.db`: cache da varredura, histórico e fila salva |
 
 **Prioridade:** padrão < `config.toml` < variáveis de ambiente < linha de comando.
-As variáveis antigas continuam valendo: `MPV_AO`, `COVERS_ONLINE`, `LYRICS_ONLINE`, `RESCAN_EVERY`, `PLAYER_NAME`, `TRASH`, `MUSIC_DIR`; e também `MUSICWEB_LANGUAGE`.
+As variáveis antigas continuam valendo: `MPV_AO`, `COVERS_ONLINE`, `LYRICS_ONLINE`, `RESCAN_EVERY`, `PLAYER_NAME`, `TRASH`, `MUSIC_DIR`; e também `MUSICWEB_LANGUAGE` e `MPV_AUDIO_DEVICE`.
 
 ### Organização das músicas
 
@@ -395,6 +493,10 @@ server.py               atalho: python server.py
 config.example.toml     modelo de configuração
 requirements.txt        dependências Python (mutagen)
 musicweb.sh             controle no Termux: start, stop, restart, status, log, install, boot on/off
+Containerfile           imagem de container para servidor Linux (mpv + ALSA)
+deploy/
+├── musicweb.container  Quadlet (serviço do Podman rootless) com a placa de som
+└── config.server.toml  configuração dentro do container (saída na P2)
 musicweb/
 ├── app.py              inicialização (argumentos, configuração, threads)
 ├── info.py             detalhes do `musicweb.sh status`

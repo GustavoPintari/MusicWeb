@@ -23,13 +23,18 @@ def mpv_start():
         os.remove(MPV_SOCK)
     except OSError:
         pass
-    mpv["proc"] = subprocess.Popen(
-        ["mpv", "--idle=yes", "--no-video", "--no-terminal", f"--ao={cfg.mpv_ao}",
-         f"--input-ipc-server={MPV_SOCK}",
-         # gapless: the next track is appended to mpv's playlist ahead of time (see queue_next)
-         f"--gapless-audio={'yes' if cfg.mpv_gapless else 'no'}", f"--prefetch-playlist={'yes' if cfg.mpv_gapless else 'no'}",
-         f"--replaygain={cfg.mpv_replaygain}"],
-        stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    # errors (and the audio output's warnings, e.g. a sound card that can't be opened) go to the server log;
+    # ipc=no: mpv_cmd hangs up as soon as it has its replies, which mpv would report as a read error
+    args = ["mpv", "--idle=yes", "--no-video", "--no-input-terminal", "--msg-level=all=error,ao=warn,ipc=no",
+            f"--input-ipc-server={MPV_SOCK}",
+            # gapless: the next track is appended to mpv's playlist ahead of time (see queue_next)
+            f"--gapless-audio={'yes' if cfg.mpv_gapless else 'no'}", f"--prefetch-playlist={'yes' if cfg.mpv_gapless else 'no'}",
+            f"--replaygain={cfg.mpv_replaygain}"]
+    if cfg.ao:
+        args.append(f"--ao={cfg.ao}")
+    if cfg.mpv_audio_device:                   # a specific sound card output, e.g. the server's P2 (analog) jack
+        args.append(f"--audio-device={cfg.mpv_audio_device}")
+    mpv["proc"] = subprocess.Popen(args, stdin=subprocess.DEVNULL)
     for _try in range(50):
         if os.path.exists(MPV_SOCK):
             return
@@ -97,7 +102,12 @@ def mpv_events():
                         continue
                     failed = ev.get("reason") == "error"
                     if failed:
-                        state["error"] = _("mpv não conseguiu tocar: {err}", err=ev.get("file_error", _("erro")))
+                        err = ev.get("file_error", _("erro"))
+                        if err == "audio output initialization failed":    # e.g. the sound card is missing or busy
+                            state["error"] = _("{player} não conseguiu abrir a saída de áudio ({device}); veja o log do servidor",
+                                               player=cfg.player_name, device=cfg.mpv_audio_device or cfg.ao or "auto")
+                        else:
+                            state["error"] = _("mpv não conseguiu tocar: {err}", err=err)
                         state["fails"] += 1
                     if ev.get("reason") in ("eof", "error") and state["active"]:
                         threading.Thread(target=track_ended, args=(failed,), daemon=True).start()

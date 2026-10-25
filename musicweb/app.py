@@ -12,7 +12,7 @@ from .web import H
 
 
 def main(argv=None):
-    ap = argparse.ArgumentParser(prog="musicweb", description="Servidor web para tocar músicas no Termux usando o mpv.")
+    ap = argparse.ArgumentParser(prog="musicweb", description="Servidor web para tocar músicas com o mpv (Termux ou servidor Linux).")
     ap.add_argument("root", nargs="?", help="pasta de músicas (padrão: [library] music_dir do config.toml)")
     ap.add_argument("--port", type=int, help="porta (padrão: [server] port)")
     ap.add_argument("--host", help="endereço (padrão: [server] host)")
@@ -44,5 +44,6 @@ def main(argv=None):
               f"{' (tocando)' if cfg.resume_on_start else ' (pausada; aperte play para continuar)'}")
     if cfg.rescan_every > 0:
         threading.Thread(target=watch_library, daemon=True).start()
-    print(f"Abra http://<ip-do-celular>:{cfg.port}")
+    print(f"Saída {cfg.player_name}: mpv --ao={cfg.ao or 'auto'} --audio-device={cfg.mpv_audio_device or 'auto'}")
+    print(f"Abra http://<ip-deste-aparelho>:{cfg.port}", flush=True)
     ThreadingHTTPServer((cfg.host, cfg.port), H).serve_forever()
