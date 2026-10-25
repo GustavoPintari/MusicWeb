@@ -5,13 +5,13 @@ from .config import cfg
 
 
 def local_ip():
-    """IP of this phone on the network (no packet is sent: a UDP "connect" only picks the route)."""
+    """IP of this phone or server on the network (no packet is sent: a UDP "connect" only picks the route)."""
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
             s.connect(("8.8.8.8", 80))
             return s.getsockname()[0]
     except OSError:
-        return "<ip-do-celular>"
+        return "<ip-deste-aparelho>"
 
 
 def main():

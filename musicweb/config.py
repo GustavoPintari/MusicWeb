@@ -19,6 +19,7 @@ FILE_KEYS = {
     ("library", "rescan_every"): ("rescan_every", int),
     ("library", "trash_dir"): ("trash_dir", str),
     ("mpv", "audio_output"): ("mpv_ao", str),
+    ("mpv", "audio_device"): ("mpv_audio_device", str),
     ("mpv", "gapless"): ("mpv_gapless", bool),
     ("mpv", "replaygain"): ("mpv_replaygain", str),
     ("covers", "online"): ("covers_online", bool),
@@ -37,6 +38,7 @@ REMOVED_SECTIONS = {"youtube": "o YouTube foi removido"}
 # accepted environment variables (the older ones keep working)
 ENV_KEYS = {
     "MPV_AO": ("mpv_ao", str),
+    "MPV_AUDIO_DEVICE": ("mpv_audio_device", str),
     "COVERS_ONLINE": ("covers_online", bool),
     "LYRICS_ONLINE": ("lyrics_online", bool),
     "RESCAN_EVERY": ("rescan_every", int),
@@ -61,12 +63,13 @@ def _conv(kind, v):
 class Config:
     host: str = "0.0.0.0"
     port: int = 8080
-    player_name: str = "Receiver"            # name of the phone audio output, shown on the page
+    player_name: str = "Receiver"            # name of the mpv audio output (phone or server), shown on the page
     language: str = "pt-BR"                  # interface language: "pt-BR" or "en"
     music_dir: str = "~/storage/music"
     rescan_every: int = 60                   # seconds between checks for new music; 0 disables
     trash_dir: str = ""                      # empty = .musicweb-lixeira folder next to the library
-    mpv_ao: str = "opensles"                 # mpv audio output
+    mpv_ao: str = ""                         # mpv audio output (--ao); empty = opensles on Termux, mpv's choice elsewhere
+    mpv_audio_device: str = ""               # mpv --audio-device, e.g. "alsa/plughw:CARD=PCH,DEV=0" (the P2 jack); empty = default
     mpv_gapless: bool = True                 # no pause between tracks (mpv output only)
     mpv_replaygain: str = "album"            # volume leveling from ReplayGain tags: "album", "track" or "no"
     covers_online: bool = True               # look up covers on iTunes / MusicBrainz
@@ -85,6 +88,13 @@ class Config:
     def lang(self):
         """Normalized interface language: "pt-BR" or "en"."""
         return LANGUAGES.get(self.language.strip().lower(), "pt-BR")
+
+    @property
+    def ao(self):
+        """mpv --ao to use, or "" to let mpv pick (any Linux with ALSA, PulseAudio or PipeWire)."""
+        if self.mpv_ao:
+            return self.mpv_ao
+        return "opensles" if os.environ.get("TERMUX_VERSION") or "com.termux" in os.environ.get("PREFIX", "") else ""
 
     @property
     def root(self):

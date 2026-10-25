@@ -164,7 +164,7 @@ $("#vup").onclick=e=>ctl.volDelta(5,e.currentTarget);
 let libVer=null;
 async function load(){
   const d=await (await fetch("/api/library")).json();libVer=d.lib;
-  if(d.api!==2){$("#lib").innerHTML=`<p class="empty" style="color:var(--err)">${T("O server.py no celular está desatualizado.")}<br>${T("Copie a versão nova e reinicie o servidor.")}</p>`;return}
+  if(d.api!==2){$("#lib").innerHTML=`<p class="empty" style="color:var(--err)">${T("O servidor do MusicWeb está desatualizado.")}<br>${T("Copie a versão nova e reinicie o servidor.")}</p>`;return}
   lib=d.albums;byId={};trackById={};playerName=d.player||"Receiver";renderOut();
   historyOn=d.history!==false;playMin=d.play_min||30;
   lib.forEach(a=>{byId[a.id]=a;a.tracks.forEach(t=>trackById[t.id]={t,a})});
