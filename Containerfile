@@ -1,5 +1,6 @@
 # MusicWeb in a container (Podman or Docker), for a Linux server.
-# The "Receiver" output is mpv playing on the server's sound card through ALSA (/dev/snd), e.g. the P2 jack.
+# The "Receiver" output is mpv playing through the host's PipeWire (its socket is mounted by the Quadlet),
+# which owns the sound card, e.g. the P2 jack or a USB DAC.
 #
 #   podman build -t localhost/musicweb .
 #

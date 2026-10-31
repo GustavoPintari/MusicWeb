@@ -5,7 +5,7 @@
 [server]
 host = "0.0.0.0"              # inside the container; the Quadlet only publishes it on 127.0.0.1
 port = 8095
-player_name = "Receiver"      # name of the server audio output (the P2 jack), shown on the page
+player_name = "Receiver"      # name of the server audio output (PipeWire -> P2 jack), shown on the page
 
 [interface]
 language = "pt-BR"
@@ -16,10 +16,12 @@ rescan_every = 60
 trash_dir = "/trash"          # removed albums: outside /music, so neither MusicWeb nor Lidarr scan them
 
 [mpv]
-audio_output = "alsa"         # straight to the sound card: no PulseAudio/PipeWire on the server
-# The analog output of the motherboard (green P2 jack at the back / headphones at the front).
-# CARD=PCH is the Intel onboard audio; list the others with: podman exec musicweb mpv --audio-device=help
-audio_device = "alsa/plughw:CARD=PCH,DEV=0"
+audio_output = "pipewire"     # the server's PipeWire (socket mounted by the Quadlet); it owns the sound card
+# Empty = PipeWire's default output, which is the P2 jack once chosen with: wpctl set-default <id>
+# (ids: wpctl status). To pin one output instead, use "pipewire/<node name>" from:
+#   podman exec musicweb mpv --audio-device=help
+# e.g. "pipewire/alsa_output.pci-0000_00_1f.3.analog-stereo" (the onboard P2); the DAC shows up as alsa_output.usb-...
+audio_device = ""
 gapless = true
 replaygain = "album"
 

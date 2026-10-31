@@ -1,22 +1,23 @@
 # Quadlet for rootless Podman: ~/.config/containers/systemd/musicweb.container
 #   systemctl --user daemon-reload && systemctl --user start musicweb
 # Web page on 127.0.0.1:8095 (publish it with: tailscale serve --bg --https=8451 http://127.0.0.1:8095).
-# The "Receiver" output plays on the server's sound card (P2 jack): the user needs to be in the "audio" group.
+# The "Receiver" output plays through the server's PipeWire (user service, see the README), which owns the sound card
+# and mixes MusicWeb with anything else sent to it. The container only needs PipeWire's socket.
 
 [Unit]
-Description=MusicWeb (player web; saída Receiver na P2 do servidor)
-Wants=network-online.target
-After=network-online.target
+Description=MusicWeb (player web; saída Receiver pelo PipeWire do servidor)
+Wants=network-online.target pipewire.socket
+After=network-online.target pipewire.socket wireplumber.service
 
 [Container]
 ContainerName=musicweb
 Image=localhost/musicweb:latest
 PublishPort=127.0.0.1:8095:8095
 Timezone=local
-# sound card: /dev/snd from the host, with the user's groups (audio) kept inside the container
-AddDevice=/dev/snd
-GroupAdd=keep-groups
-# no SELinux on Debian, so this changes nothing there; on Fedora/RHEL it is what lets the container open /dev/snd
+# PipeWire's socket from the user's runtime dir (%t = /run/user/<uid>); mpv talks to it with --ao=pipewire
+Volume=%t/pipewire-0:/run/pipewire/pipewire-0
+Environment=PIPEWIRE_RUNTIME_DIR=/run/pipewire
+# no SELinux on Debian, so this changes nothing there; on Fedora/RHEL it is what lets the container open the socket
 SecurityLabelDisable=true
 # init process: reaps mpv and passes on SIGTERM
 PodmanArgs=--init
