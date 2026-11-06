@@ -88,20 +88,29 @@ On some phones you also need to exclude Termux from battery optimization (Settin
 
 ### Linux server (Podman)
 
-MusicWeb also runs in a container on a Linux server. The 📻 *Receiver* output then is the **server's sound card** — e.g. the P2 (3.5 mm) jack of the motherboard, wired to the receiver/speakers — played by mpv straight through ALSA (no PulseAudio/PipeWire needed). The files in [`deploy/`](deploy) assume rootless Podman with Quadlet, the music in `/srv/media/music` and the data in `/storage/apps/musicweb`; adjust the paths in `deploy/musicweb.container` if yours differ.
+MusicWeb also runs in a container on a Linux server. The 📻 *Receiver* output then is the **server's sound card** — e.g. the P2 (3.5 mm) jack of the motherboard, wired to the receiver/speakers — played by mpv through the server's **PipeWire**, which owns the card and mixes MusicWeb with anything else sent to it (e.g. a Steam Deck over the network). The files in [`deploy/`](deploy) assume rootless Podman with Quadlet, the music in `/srv/media/music` and the data in `/storage/apps/musicweb`; adjust the paths in `deploy/musicweb.container` if yours differ.
 
-**1. Sound card** (once, on the server):
+**1. Sound card and PipeWire** (once, on the server — headless Debian is enough):
 
 ```bash
-sudo apt install alsa-utils
-sudo usermod -aG audio $USER        # the container reaches /dev/snd through this group
+sudo apt install pipewire pipewire-pulse wireplumber dbus-user-session alsa-utils
+sudo usermod -aG audio $USER        # PipeWire opens the card through this group (no desktop session here)
+sudo loginctl enable-linger $USER   # user services run from boot, without logging in
 aplay -l                            # the onboard audio shows up as card "PCH" (device 0 = analog / P2)
 amixer -c PCH sset Master 100% unmute
 amixer -c PCH sset Headphone 100% unmute   # front jack (names vary by board: alsamixer -c PCH shows them)
 amixer -c PCH sset Front 100% unmute       # green jack at the back
 sudo alsactl store                  # keeps these levels across reboots (alsa-utils restores them on boot)
 sudo reboot                         # so the user services pick up the "audio" group
+
+# after the reboot:
+systemctl --user enable --now pipewire pipewire-pulse wireplumber
+wpctl status                        # lists the outputs; note the id of the P2 ("Built-in Audio Analog Stereo")
+wpctl set-default <id>              # MusicWeb plays on the default output
+wpctl set-volume @DEFAULT_AUDIO_SINK@ 1.0   # leave the digital volume at 100%: the receiver is the volume knob
 ```
+
+Optional but recommended, from [`deploy/pipewire/`](deploy/pipewire): `10-rates.conf` (follow the file's sample rate instead of resampling everything to 48 kHz) and `51-no-suspend.conf` (no click when a song starts after silence). Copy each to the path in its first line and run `systemctl --user restart pipewire wireplumber`. To receive sound from another device on the server's output, see `20-tcp.conf`.
 
 **2. Folders, image and service:**
 
@@ -117,20 +126,20 @@ sudo tailscale serve --bg --https=8451 http://127.0.0.1:8095    # https://<serve
 
 The page only listens on `127.0.0.1:8095`; `tailscale serve` publishes it on the tailnet (or point any reverse proxy at it). Removed albums go to `/srv/media/.musicweb-lixeira`, outside the library.
 
-**Configuration:** the image brings [`deploy/config.server.toml`](deploy/config.server.toml) (container paths, `audio_output = "alsa"`, `audio_device = "alsa/plughw:CARD=PCH,DEV=0"`). To change it, copy it to `/storage/apps/musicweb/config.toml`, uncomment the matching `Volume=` line in the Quadlet, then `systemctl --user daemon-reload && systemctl --user restart musicweb`. A single setting can also go in the Quadlet as `Environment=MPV_AUDIO_DEVICE=...`.
+**Configuration:** the image brings [`deploy/config.server.toml`](deploy/config.server.toml) (container paths, `audio_output = "pipewire"` and PipeWire's default output). To change it, copy it to `/storage/apps/musicweb/config.toml`, uncomment the matching `Volume=` line in the Quadlet, then `systemctl --user daemon-reload && systemctl --user restart musicweb`. A single setting can also go in the Quadlet as `Environment=MPV_AUDIO_DEVICE=...`.
 
 **Update:** `cd ~/MusicWeb && git pull && podman build -t localhost/musicweb . && systemctl --user restart musicweb`.
 
 **Checking the sound:**
 
 ```bash
-podman exec musicweb mpv --audio-device=help               # outputs mpv can see (use one in audio_device)
-podman exec musicweb speaker-test -D plughw:CARD=PCH,DEV=0 -c 2 -t wav -l 1   # "front left, front right" on the P2
-podman exec -it musicweb alsamixer -c PCH                   # mixer (M unmutes; Esc quits)
+podman exec musicweb mpv --audio-device=help               # outputs mpv can see through PipeWire (use one in audio_device)
+wpctl status                                                # on the server: outputs and which one is the default
+alsamixer -c PCH                                            # on the server: mixer (M unmutes; Esc quits)
 journalctl --user -u musicweb -e                            # server log, with mpv's audio errors
 ```
 
-If the card can't be opened, the page shows "Receiver couldn't open the audio output" and the log says why. `plughw` uses the card exclusively: another program playing on the same jack (e.g. PipeWire, if a desktop is installed later) leaves it "busy" — then use that program's output instead (`audio_output = "pipewire"` or `"pulse"`, with its socket mounted in the container).
+If the card can't be opened, the page shows "Receiver couldn't open the audio output" and the log says why. If PipeWire isn't running (`systemctl --user status pipewire`), the socket the Quadlet mounts doesn't exist and the container fails to start. **Without PipeWire** the older setup still works: remove the `pipewire-0` volume and `PIPEWIRE_RUNTIME_DIR` from the Quadlet, add `AddDevice=/dev/snd` and `GroupAdd=keep-groups`, and use `audio_output = "alsa"` with `audio_device = "alsa/plughw:CARD=PCH,DEV=0"` — but `plughw` takes the card exclusively, so only one program can play at a time.
 
 ### Configuration
 
@@ -215,10 +224,11 @@ server.py               shortcut: python server.py
 config.example.toml     configuration template
 requirements.txt        Python dependencies (mutagen)
 musicweb.sh             Termux control: start, stop, restart, status, log, install, boot on/off
-Containerfile           container image for a Linux server (mpv + ALSA)
+Containerfile           container image for a Linux server (mpv + PipeWire)
 deploy/
-├── musicweb.container  Quadlet (rootless Podman service) with the sound card
-└── config.server.toml  configuration inside the container (P2 jack output)
+├── musicweb.container  Quadlet (rootless Podman service) with PipeWire's socket
+├── config.server.toml  configuration inside the container (PipeWire output)
+└── pipewire/           optional PipeWire/WirePlumber settings (sample rates, no suspend, network input)
 musicweb/
 ├── app.py              startup (arguments, configuration, threads)
 ├── info.py             `musicweb.sh status` details
@@ -366,20 +376,29 @@ Em alguns aparelhos também é preciso tirar o Termux da otimização de bateria
 
 ### Servidor Linux (Podman)
 
-O MusicWeb também roda em container num servidor Linux. A saída 📻 *Receiver* passa a ser a **placa de som do servidor** — por exemplo a saída P2 da placa‑mãe, ligada no receiver/caixas — tocada pelo mpv direto no ALSA (sem PulseAudio/PipeWire). Os arquivos em [`deploy/`](deploy) consideram Podman rootless com Quadlet, as músicas em `/srv/media/music` e os dados em `/storage/apps/musicweb`; ajuste os caminhos no `deploy/musicweb.container` se os seus forem outros.
+O MusicWeb também roda em container num servidor Linux. A saída 📻 *Receiver* passa a ser a **placa de som do servidor** — por exemplo a saída P2 da placa‑mãe, ligada no receiver/caixas — tocada pelo mpv através do **PipeWire** do servidor, que é dono da placa e mistura o MusicWeb com qualquer outra coisa enviada a ela (por exemplo um Steam Deck pela rede). Os arquivos em [`deploy/`](deploy) consideram Podman rootless com Quadlet, as músicas em `/srv/media/music` e os dados em `/storage/apps/musicweb`; ajuste os caminhos no `deploy/musicweb.container` se os seus forem outros.
 
-**1. Placa de som** (uma vez, no servidor):
+**1. Placa de som e PipeWire** (uma vez, no servidor — um Debian sem interface gráfica basta):
 
 ```bash
-sudo apt install alsa-utils
-sudo usermod -aG audio $USER        # o container acessa o /dev/snd por esse grupo
+sudo apt install pipewire pipewire-pulse wireplumber dbus-user-session alsa-utils
+sudo usermod -aG audio $USER        # o PipeWire abre a placa por esse grupo (aqui não há sessão de desktop)
+sudo loginctl enable-linger $USER   # serviços do usuário sobem no boot, sem precisar logar
 aplay -l                            # o áudio da placa-mãe aparece como card "PCH" (device 0 = analógica / P2)
 amixer -c PCH sset Master 100% unmute
 amixer -c PCH sset Headphone 100% unmute   # P2 da frente (os nomes mudam por placa: alsamixer -c PCH mostra)
 amixer -c PCH sset Front 100% unmute       # P2 verde de trás
 sudo alsactl store                  # guarda esses níveis entre boots (o alsa-utils restaura no boot)
 sudo reboot                         # para os serviços do usuário pegarem o grupo "audio"
+
+# depois do reboot:
+systemctl --user enable --now pipewire pipewire-pulse wireplumber
+wpctl status                        # lista as saídas; anote o id da P2 ("Built-in Audio Analog Stereo")
+wpctl set-default <id>              # o MusicWeb toca na saída padrão
+wpctl set-volume @DEFAULT_AUDIO_SINK@ 1.0   # deixe o volume digital em 100%: o volume é o do receiver
 ```
+
+Opcional, mas recomendado, em [`deploy/pipewire/`](deploy/pipewire): `10-rates.conf` (acompanha a taxa do arquivo em vez de reamostrar tudo para 48 kHz) e `51-no-suspend.conf` (sem estalo quando uma música começa depois de silêncio). Copie cada um para o caminho da primeira linha e rode `systemctl --user restart pipewire wireplumber`. Para receber o som de outro aparelho na saída do servidor, veja o `20-tcp.conf`.
 
 **2. Pastas, imagem e serviço:**
 
@@ -395,20 +414,20 @@ sudo tailscale serve --bg --https=8451 http://127.0.0.1:8095    # https://<servi
 
 A página só escuta em `127.0.0.1:8095`; o `tailscale serve` publica na tailnet (ou aponte um proxy reverso para ela). Álbuns removidos vão para `/srv/media/.musicweb-lixeira`, fora da biblioteca.
 
-**Configuração:** a imagem traz o [`deploy/config.server.toml`](deploy/config.server.toml) (caminhos do container, `audio_output = "alsa"`, `audio_device = "alsa/plughw:CARD=PCH,DEV=0"`). Para mudar, copie para `/storage/apps/musicweb/config.toml`, descomente a linha `Volume=` correspondente no Quadlet e rode `systemctl --user daemon-reload && systemctl --user restart musicweb`. Uma opção avulsa também pode ir no Quadlet como `Environment=MPV_AUDIO_DEVICE=...`.
+**Configuração:** a imagem traz o [`deploy/config.server.toml`](deploy/config.server.toml) (caminhos do container, `audio_output = "pipewire"` e a saída padrão do PipeWire). Para mudar, copie para `/storage/apps/musicweb/config.toml`, descomente a linha `Volume=` correspondente no Quadlet e rode `systemctl --user daemon-reload && systemctl --user restart musicweb`. Uma opção avulsa também pode ir no Quadlet como `Environment=MPV_AUDIO_DEVICE=...`.
 
 **Atualizar:** `cd ~/MusicWeb && git pull && podman build -t localhost/musicweb . && systemctl --user restart musicweb`.
 
 **Conferindo o som:**
 
 ```bash
-podman exec musicweb mpv --audio-device=help               # saídas que o mpv enxerga (use uma em audio_device)
-podman exec musicweb speaker-test -D plughw:CARD=PCH,DEV=0 -c 2 -t wav -l 1   # "front left, front right" na P2
-podman exec -it musicweb alsamixer -c PCH                   # mixer (M tira do mudo; Esc sai)
+podman exec musicweb mpv --audio-device=help               # saídas que o mpv enxerga pelo PipeWire (use uma em audio_device)
+wpctl status                                                # no servidor: saídas e qual é a padrão
+alsamixer -c PCH                                            # no servidor: mixer (M tira do mudo; Esc sai)
 journalctl --user -u musicweb -e                            # log do servidor, com os erros de áudio do mpv
 ```
 
-Se a placa não abrir, a página mostra "Receiver não conseguiu abrir a saída de áudio" e o log diz o motivo. O `plughw` usa a placa com exclusividade: outro programa tocando na mesma saída (por exemplo o PipeWire, se um dia instalar um desktop) a deixa "ocupada" — aí use a saída desse programa (`audio_output = "pipewire"` ou `"pulse"`, com o socket dele montado no container).
+Se a placa não abrir, a página mostra "Receiver não conseguiu abrir a saída de áudio" e o log diz o motivo. Se o PipeWire não estiver rodando (`systemctl --user status pipewire`), o socket que o Quadlet monta não existe e o container não sobe. **Sem PipeWire** o modo antigo continua valendo: tire o volume `pipewire-0` e o `PIPEWIRE_RUNTIME_DIR` do Quadlet, volte com `AddDevice=/dev/snd` e `GroupAdd=keep-groups` e use `audio_output = "alsa"` com `audio_device = "alsa/plughw:CARD=PCH,DEV=0"` — mas o `plughw` usa a placa com exclusividade, então só um programa toca por vez.
 
 ### Configuração
 
@@ -493,10 +512,11 @@ server.py               atalho: python server.py
 config.example.toml     modelo de configuração
 requirements.txt        dependências Python (mutagen)
 musicweb.sh             controle no Termux: start, stop, restart, status, log, install, boot on/off
-Containerfile           imagem de container para servidor Linux (mpv + ALSA)
+Containerfile           imagem de container para servidor Linux (mpv + PipeWire)
 deploy/
-├── musicweb.container  Quadlet (serviço do Podman rootless) com a placa de som
-└── config.server.toml  configuração dentro do container (saída na P2)
+├── musicweb.container  Quadlet (serviço do Podman rootless) com o socket do PipeWire
+├── config.server.toml  configuração dentro do container (saída pelo PipeWire)
+└── pipewire/           ajustes opcionais do PipeWire/WirePlumber (taxas, sem suspender, entrada pela rede)
 musicweb/
 ├── app.py              inicialização (argumentos, configuração, threads)
 ├── info.py             detalhes do `musicweb.sh status`
